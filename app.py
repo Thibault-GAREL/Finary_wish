@@ -725,6 +725,9 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
     has_cto = any(cat.startswith('CTO') for cat in epargne_categories)
     has_bourse = has_pea or has_cto
 
+    # Récupérer les catégories de sorties pour la détection de "Frais au plancher"
+    sorties_categories = df[df['Type'] == 'Sortie']['Catégorie'].tolist()
+
     # 1. Investissement en bourse (10 points) - Auto-détecté
     if has_bourse:
         scores['bourse']['score'] += 10
@@ -814,17 +817,17 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
             'calculable': True
         })
 
-    # 5. Frais au plancher (2 points) - Auto-détecté
-    has_frais = any(cat.startswith('Frais au plancher') for cat in epargne_categories)
+    # 5. Frais au plancher (2 points) - Auto-détecté dans les SORTIES
+    has_frais = any(cat.startswith('Frais au plancher') for cat in sorties_categories)
     if has_frais:
         scores['bourse']['score'] += 2
-        frais_categories = [cat for cat in epargne_categories if cat.startswith('Frais au plancher')]
+        frais_categories = [cat for cat in sorties_categories if cat.startswith('Frais au plancher')]
         scores['bourse']['details'].append({
             'critere': 'Frais au plancher',
             'score': 2,
             'max': 2,
             'obtenu': True,
-            'explication': f"Détecté: {', '.join(frais_categories)}",
+            'explication': f"Détecté dans sorties: {', '.join(frais_categories)}",
             'calculable': True
         })
     else:
@@ -833,7 +836,7 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
             'score': 0,
             'max': 2,
             'obtenu': False,
-            'explication': 'Aucune catégorie "Frais au plancher" détectée',
+            'explication': 'Aucune catégorie "Frais au plancher" détectée dans les sorties',
             'calculable': True
         })
 

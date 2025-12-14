@@ -236,6 +236,115 @@ def plot_bar_chart(df: pd.DataFrame, title: str, color: str = '#1f77b4') -> go.F
     return fig
 
 
+def plot_sankey_diagram(data: dict) -> go.Figure:
+    """
+    Crée un diagramme de Sankey montrant le flux d'argent des entrées vers les sorties et l'épargne.
+
+    Args:
+        data: Dictionnaire contenant les données du mois
+
+    Returns:
+        Figure Plotly avec le diagramme de Sankey
+    """
+    # Préparer les données pour le diagramme de Sankey
+    labels = []  # Noms de tous les nœuds
+    sources = []  # Indices des nœuds sources
+    targets = []  # Indices des nœuds cibles
+    values = []  # Montants des flux
+    colors = []  # Couleurs des liens
+
+    # Couleurs personnalisées
+    color_entrees = 'rgba(34, 139, 34, 0.4)'  # Vert pour les entrées
+    color_sorties = 'rgba(255, 99, 71, 0.4)'  # Rouge pour les sorties
+    color_epargne = 'rgba(65, 105, 225, 0.4)'  # Bleu pour l'épargne
+
+    # Index des nœuds
+    current_index = 0
+
+    # 1. Ajouter les nœuds d'entrées
+    entrees_start_idx = current_index
+    for _, row in data['entrees'].iterrows():
+        labels.append(row['Catégorie'])
+        current_index += 1
+    entrees_end_idx = current_index
+
+    # 2. Ajouter le nœud central "Total Entrées"
+    total_entrees_idx = current_index
+    labels.append('💰 Total Entrées')
+    current_index += 1
+
+    # 3. Ajouter les nœuds de sorties
+    sorties_start_idx = current_index
+    for _, row in data['sorties'].iterrows():
+        labels.append(row['Catégorie'])
+        current_index += 1
+    sorties_end_idx = current_index
+
+    # 4. Ajouter les nœuds d'épargne
+    epargne_start_idx = current_index
+    for _, row in data['epargne'].iterrows():
+        labels.append(row['Catégorie'])
+        current_index += 1
+
+    # Créer les liens : Entrées -> Total Entrées
+    for idx, (_, row) in enumerate(data['entrees'].iterrows()):
+        sources.append(entrees_start_idx + idx)
+        targets.append(total_entrees_idx)
+        values.append(row['Montant'])
+        colors.append(color_entrees)
+
+    # Créer les liens : Total Entrées -> Sorties
+    for idx, (_, row) in enumerate(data['sorties'].iterrows()):
+        sources.append(total_entrees_idx)
+        targets.append(sorties_start_idx + idx)
+        values.append(row['Montant'])
+        colors.append(color_sorties)
+
+    # Créer les liens : Total Entrées -> Épargne
+    for idx, (_, row) in enumerate(data['epargne'].iterrows()):
+        sources.append(total_entrees_idx)
+        targets.append(epargne_start_idx + idx)
+        values.append(row['Montant'])
+        colors.append(color_epargne)
+
+    # Créer le diagramme de Sankey
+    fig = go.Figure(data=[go.Sankey(
+        node=dict(
+            pad=15,
+            thickness=20,
+            line=dict(color='black', width=0.5),
+            label=labels,
+            color=['#2E8B57' if i < entrees_end_idx  # Vert pour entrées
+                   else '#4169E1' if i >= epargne_start_idx  # Bleu pour épargne
+                   else '#FF6347' if i >= sorties_start_idx  # Rouge pour sorties
+                   else '#FFD700'  # Or pour le nœud central
+                   for i in range(len(labels))],
+            customdata=[f'{i}' for i in range(len(labels))],
+            hovertemplate='<b>%{label}</b><br>Total: %{value:.2f} €<extra></extra>'
+        ),
+        link=dict(
+            source=sources,
+            target=targets,
+            value=values,
+            color=colors,
+            hovertemplate='%{source.label} → %{target.label}<br>%{value:.2f} €<extra></extra>'
+        )
+    )])
+
+    fig.update_layout(
+        title={
+            'text': "🌊 Flux d'Argent - Diagramme de Sankey",
+            'x': 0.5,
+            'xanchor': 'center'
+        },
+        font=dict(size=12),
+        height=600,
+        margin=dict(t=80, b=40, l=40, r=40)
+    )
+
+    return fig
+
+
 def display_detailed_tables(data: dict):
     """
     Affiche les tableaux détaillés pour chaque type de transaction.
@@ -334,6 +443,13 @@ def main():
 
     # Afficher les métriques clés
     display_metrics(month_data)
+
+    st.markdown("---")
+
+    # Diagramme de Sankey - Flux d'argent
+    st.markdown("### 🌊 Flux d'Argent")
+    fig_sankey = plot_sankey_diagram(month_data)
+    st.plotly_chart(fig_sankey, use_container_width=True)
 
     st.markdown("---")
 

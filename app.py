@@ -442,8 +442,6 @@ def plot_sankey_diagram(data: dict) -> go.Figure:
     targets = []  # Indices des nœuds cibles
     values = []  # Montants des flux
     colors = []  # Couleurs des liens
-    x_positions = []  # Positions X des nœuds (0 à 1)
-    y_positions = []  # Positions Y des nœuds (0 à 1)
 
     # Couleurs personnalisées
     color_entrees = 'rgba(34, 139, 34, 0.4)'  # Vert pour les entrées
@@ -456,49 +454,36 @@ def plot_sankey_diagram(data: dict) -> go.Figure:
 
     # 1. Ajouter les nœuds d'entrées avec montants
     entrees_start_idx = current_index
-    nb_entrees = len(data['entrees'])
-    for idx, (_, row) in enumerate(data['entrees'].iterrows()):
+    for _, row in data['entrees'].iterrows():
         labels.append(f"{row['Catégorie']}<br>{row['Montant']:.0f} €")
-        x_positions.append(0.01)  # Gauche du diagramme
-        y_positions.append(idx / max(nb_entrees - 1, 1))  # Répartir verticalement
         current_index += 1
     entrees_end_idx = current_index
 
     # 2. Ajouter le nœud central "Total Entrées"
     total_entrees_idx = current_index
     labels.append(f"💰 Total<br>{data['total_entrees']:.0f} €")
-    x_positions.append(0.4)  # Centre du diagramme
-    y_positions.append(0.5)  # Milieu vertical
     current_index += 1
 
     # 3. Ajouter les nœuds de sorties avec montants
     sorties_start_idx = current_index
-    nb_sorties = len(data['sorties'])
-    for idx, (_, row) in enumerate(data['sorties'].iterrows()):
+    for _, row in data['sorties'].iterrows():
         labels.append(f"{row['Catégorie']}<br>{row['Montant']:.0f} €")
-        x_positions.append(0.99)  # Droite du diagramme
-        y_positions.append(idx / max(nb_sorties - 1, 1) * 0.4)  # Haut du diagramme (0-40%)
         current_index += 1
     sorties_end_idx = current_index
 
     # 4. Ajouter les nœuds d'épargne avec montants
     epargne_start_idx = current_index
-    nb_epargne = len(data['epargne'])
-    for idx, (_, row) in enumerate(data['epargne'].iterrows()):
+    for _, row in data['epargne'].iterrows():
         labels.append(f"{row['Catégorie']}<br>{row['Montant']:.0f} €")
-        x_positions.append(0.99)  # Droite du diagramme
-        y_positions.append(0.45 + idx / max(nb_epargne - 1, 1) * 0.3)  # Milieu du diagramme (45-75%)
         current_index += 1
     epargne_end_idx = current_index
 
-    # 5. Calculer et ajouter le nœud "Marge non épargnée"
+    # 5. Calculer et ajouter le nœud "Marge non épargnée" (à la fin pour qu'il soit en bas)
     marge_non_epargnee = data['total_entrees'] - data['total_sorties'] - data['total_epargne']
     marge_idx = None
     if marge_non_epargnee > 0:
         marge_idx = current_index
         labels.append(f"💎 Marge non épargnée<br>{marge_non_epargnee:.0f} €")
-        x_positions.append(0.99)  # Droite du diagramme
-        y_positions.append(0.95)  # Tout en bas (95%)
         current_index += 1
 
     # Créer les liens : Entrées -> Total Entrées
@@ -536,8 +521,6 @@ def plot_sankey_diagram(data: dict) -> go.Figure:
             thickness=25,
             line=dict(color='white', width=2),
             label=labels,
-            x=x_positions,
-            y=y_positions,
             color=['#228B22' if i < entrees_end_idx  # Vert foncé pour entrées
                    else '#FFA500' if i == total_entrees_idx  # Orange pour le nœud central
                    else '#DC143C' if sorties_start_idx <= i < sorties_end_idx  # Rouge foncé pour sorties
@@ -757,7 +740,30 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
             'calculable': True
         })
 
-    # 3. CTO (Compte-Titres Ordinaire) (1 point) - Auto-détecté
+    # 3. Investissement sur des ETFs (3 points) - Auto-détecté
+    has_etf = any('ETF' in cat.upper() for cat in epargne_categories)
+    if has_etf:
+        scores['bourse']['score'] += 3
+        etf_categories = [cat for cat in epargne_categories if 'ETF' in cat.upper()]
+        scores['bourse']['details'].append({
+            'critere': 'Investissement sur des ETFs',
+            'score': 3,
+            'max': 3,
+            'obtenu': True,
+            'explication': f"Détecté: {', '.join(etf_categories)}",
+            'calculable': True
+        })
+    else:
+        scores['bourse']['details'].append({
+            'critere': 'Investissement sur des ETFs',
+            'score': 0,
+            'max': 3,
+            'obtenu': False,
+            'explication': 'Aucune catégorie contenant ETF détectée',
+            'calculable': True
+        })
+
+    # 4. CTO (Compte-Titres Ordinaire) (1 point) - Auto-détecté
     if has_cto:
         scores['bourse']['score'] += 1
         cto_categories = [cat for cat in epargne_categories if cat.startswith('CTO')]
@@ -781,7 +787,6 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
 
     # Critères manuels restants
     bourse_criteres_manuels = [
-        ('Investissement sur des ETFs', 3),
         ('Minimum d\'overlap entre les ETFs', 1),
         ('Frais au plancher', 2),
         ('DCA tous les mois', 3),

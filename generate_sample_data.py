@@ -91,7 +91,8 @@ def generate_finance_data(start_date: str = '2024-01', num_months: int = 12) -> 
         # ÉPARGNE
         {'Catégorie': 'Livret A', 'Type': 'Épargne', 'base': 300, 'variation': 0.15},
         {'Catégorie': 'Compte Épargne', 'Type': 'Épargne', 'base': 200, 'variation': 0.2},
-        {'Catégorie': 'PEA', 'Type': 'Épargne', 'base': 150, 'variation': 0.25},
+        {'Catégorie': 'PEA ETF World', 'Type': 'Épargne', 'base': 150, 'variation': 0.25},
+        {'Catégorie': 'CTO Actions', 'Type': 'Épargne', 'base': 100, 'variation': 0.3},
     ]
 
     # Créer le DataFrame

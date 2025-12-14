@@ -480,9 +480,9 @@ def plot_sankey_diagram(data: dict) -> go.Figure:
     autres_epargne = []
 
     for _, row in data['epargne'].iterrows():
-        if row['Catégorie'].startswith('PEA'):
+        if row['Catégorie'].upper().startswith('PEA'):
             pea_total += row['Montant']
-        elif row['Catégorie'].startswith('CTO'):
+        elif row['Catégorie'].upper().startswith('CTO'):
             cto_total += row['Montant']
         else:
             autres_epargne.append(row)
@@ -721,8 +721,8 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
 
     # Détecter automatiquement les investissements PEA/CTO dans les catégories d'épargne
     epargne_categories = df[df['Type'] == 'Épargne']['Catégorie'].tolist()
-    has_pea = any(cat.startswith('PEA') for cat in epargne_categories)
-    has_cto = any(cat.startswith('CTO') for cat in epargne_categories)
+    has_pea = any(cat.upper().startswith('PEA') for cat in epargne_categories)
+    has_cto = any(cat.upper().startswith('CTO') for cat in epargne_categories)
     has_bourse = has_pea or has_cto
 
     # Récupérer les catégories de sorties pour la détection de "Frais au plancher"
@@ -731,7 +731,7 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
     # 1. Investissement en bourse (10 points) - Auto-détecté
     if has_bourse:
         scores['bourse']['score'] += 10
-        categories_bourse = [cat for cat in epargne_categories if cat.startswith('PEA') or cat.startswith('CTO')]
+        categories_bourse = [cat for cat in epargne_categories if cat.upper().startswith('PEA') or cat.upper().startswith('CTO')]
         scores['bourse']['details'].append({
             'critere': 'Investissement en bourse',
             'score': 10,
@@ -753,7 +753,7 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
     # 2. Investissement via PEA en priorité (3 points) - Auto-détecté
     if has_pea:
         scores['bourse']['score'] += 3
-        pea_categories = [cat for cat in epargne_categories if cat.startswith('PEA')]
+        pea_categories = [cat for cat in epargne_categories if cat.upper().startswith('PEA')]
         scores['bourse']['details'].append({
             'critere': 'Investissement via PEA en priorité',
             'score': 3,
@@ -798,7 +798,7 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
     # 4. CTO (Compte-Titres Ordinaire) (1 point) - Auto-détecté
     if has_cto:
         scores['bourse']['score'] += 1
-        cto_categories = [cat for cat in epargne_categories if cat.startswith('CTO')]
+        cto_categories = [cat for cat in epargne_categories if cat.upper().startswith('CTO')]
         scores['bourse']['details'].append({
             'critere': 'CTO (Compte-Titres Ordinaire)',
             'score': 1,

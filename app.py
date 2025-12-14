@@ -471,11 +471,40 @@ def plot_sankey_diagram(data: dict) -> go.Figure:
         current_index += 1
     sorties_end_idx = current_index
 
-    # 4. Ajouter les nœuds d'épargne avec montants
+    # 4. Ajouter les nœuds d'épargne avec regroupement PEA/CTO
     epargne_start_idx = current_index
+
+    # Regrouper les catégories PEA et CTO
+    pea_total = 0
+    cto_total = 0
+    autres_epargne = []
+
     for _, row in data['epargne'].iterrows():
-        labels.append(f"{row['Catégorie']}<br>{row['Montant']:.0f} €")
+        if row['Catégorie'].startswith('PEA'):
+            pea_total += row['Montant']
+        elif row['Catégorie'].startswith('CTO'):
+            cto_total += row['Montant']
+        else:
+            autres_epargne.append(row)
+
+    # Créer les nœuds regroupés et stocker les informations pour les liens
+    epargne_nodes = []  # Liste des (label, montant) pour créer les liens ensuite
+
+    if pea_total > 0:
+        labels.append(f"PEA<br>{pea_total:.0f} €")
+        epargne_nodes.append(('PEA', pea_total))
         current_index += 1
+
+    if cto_total > 0:
+        labels.append(f"CTO<br>{cto_total:.0f} €")
+        epargne_nodes.append(('CTO', cto_total))
+        current_index += 1
+
+    for row in autres_epargne:
+        labels.append(f"{row['Catégorie']}<br>{row['Montant']:.0f} €")
+        epargne_nodes.append((row['Catégorie'], row['Montant']))
+        current_index += 1
+
     epargne_end_idx = current_index
 
     # 5. Calculer et ajouter le nœud "Marge non épargnée" (à la fin pour qu'il soit en bas)
@@ -500,11 +529,11 @@ def plot_sankey_diagram(data: dict) -> go.Figure:
         values.append(row['Montant'])
         colors.append(color_sorties)
 
-    # Créer les liens : Total Entrées -> Épargne
-    for idx, (_, row) in enumerate(data['epargne'].iterrows()):
+    # Créer les liens : Total Entrées -> Épargne (avec regroupement PEA/CTO)
+    for idx, (label, montant) in enumerate(epargne_nodes):
         sources.append(total_entrees_idx)
         targets.append(epargne_start_idx + idx)
-        values.append(row['Montant'])
+        values.append(montant)
         colors.append(color_epargne)
 
     # Créer le lien : Total Entrées -> Marge non épargnée

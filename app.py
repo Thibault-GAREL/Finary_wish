@@ -879,8 +879,7 @@ def display_comparison_metrics(data1: dict, data2: dict, month1: str, month2: st
         st.metric(
             label="💸 Sorties",
             value=f"{data2['total_sorties']:.2f} €",
-            delta=f"{diff_sorties:+.2f} €",
-            delta_color="inverse"
+            delta=f"{diff_sorties:+.2f} €"
         )
 
     with col3:
@@ -1054,23 +1053,6 @@ def main():
 
     st.sidebar.markdown("---")
 
-    # Sélection de catégorie uniquement pour la page évolution
-    if page == "📈 Évolution d'une Catégorie":
-        st.sidebar.markdown("### 🏷️ Sélection de catégorie")
-        all_categories = get_all_categories(df)
-        category_options = [f"{cat} ({typ})" for cat, typ in all_categories]
-
-        selected_category_full = st.sidebar.selectbox(
-            "Choisissez une catégorie :",
-            options=category_options,
-            index=0
-        )
-        # Extraire le nom de la catégorie
-        selected_category = selected_category_full.split(" (")[0]
-        st.sidebar.markdown("---")
-    else:
-        selected_category = None
-
     # Informations générales
     st.sidebar.markdown("### 📊 Informations")
     st.sidebar.info(
@@ -1168,10 +1150,8 @@ def main():
     elif page == "⚖️ Tableau de bord - Comparaison":
         st.markdown("## ⚖️ Tableau de bord - Comparaison")
 
-        # Sélecteurs de mois dans la page
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col1:
-            st.markdown("")  # Espaceur
+        # Sélecteurs de mois dans la page (centrés)
+        col1, col2, col3, col4, col5 = st.columns([1, 1.5, 0.5, 1.5, 1])
         with col2:
             selected_month = st.selectbox(
                 "📅 Mois 1 :",
@@ -1179,7 +1159,7 @@ def main():
                 index=max(0, len(available_months) - 2),  # Avant-dernier mois
                 key="month_comp_1"
             )
-        with col3:
+        with col4:
             selected_month2 = st.selectbox(
                 "📅 Mois 2 :",
                 options=available_months,
@@ -1259,24 +1239,32 @@ def main():
     # PAGE 3 : ÉVOLUTION D'UNE CATÉGORIE
     # ========================================================================
     else:  # page == "📈 Évolution d'une Catégorie"
-        # Afficher le titre
+        st.markdown("## 📈 Évolution d'une Catégorie")
+
+        # Sélecteur de catégorie dans la page (centré)
+        all_categories = get_all_categories(df)
+        category_options = [f"{cat} ({typ})" for cat, typ in all_categories]
+
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            selected_category_full = st.selectbox(
+                "🏷️ Sélectionnez une catégorie :",
+                options=category_options,
+                index=0,
+                key="category_evolution"
+            )
+
+        # Extraire le nom de la catégorie
+        selected_category = selected_category_full.split(" (")[0]
+
+        st.markdown("---")
+
+        # Récupérer les données d'évolution
         evolution_data = get_category_evolution(df, selected_category)
 
         if evolution_data is None:
             st.error(f"❌ Catégorie '{selected_category}' introuvable.")
             st.stop()
-
-        cat_type = evolution_data['type']
-        type_emoji = {
-            'Entrée': '💰',
-            'Sortie': '💸',
-            'Épargne': '🏦'
-        }
-        emoji = type_emoji.get(cat_type, '📊')
-
-        st.markdown(f"## {emoji} Évolution : **{selected_category}**")
-        st.markdown(f"*Type : {cat_type}*")
-        st.markdown("---")
 
         # Statistiques
         st.markdown("### 📊 Statistiques Globales")

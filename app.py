@@ -1011,19 +1011,39 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
             'calculable': True
         })
 
-    # Critères manuels restants
-    crypto_criteres_manuels = [
-        ('DCA tous les mois/semaines', 1)
-    ]
+    # 3. DCA tous les mois/semaines (1 point) - Auto-détecté dans les SORTIES
+    # sorties_categories déjà récupéré plus haut pour Frais au plancher
+    has_dca_crypto = any(
+        'BITCOIN' in cat.upper() or 'BTC' in cat.upper() or
+        'ETHEREUM' in cat.upper() or 'ETH' in cat.upper() or
+        'CRYPTO' in cat.upper()
+        for cat in sorties_categories
+    )
 
-    for critere, max_pts in crypto_criteres_manuels:
+    if has_dca_crypto:
+        scores['crypto']['score'] += 1
+        dca_categories = [
+            cat for cat in sorties_categories
+            if 'BITCOIN' in cat.upper() or 'BTC' in cat.upper() or
+               'ETHEREUM' in cat.upper() or 'ETH' in cat.upper() or
+               'CRYPTO' in cat.upper()
+        ]
         scores['crypto']['details'].append({
-            'critere': critere,
+            'critere': 'DCA tous les mois/semaines',
+            'score': 1,
+            'max': 1,
+            'obtenu': True,
+            'explication': f"Achats réguliers détectés: {', '.join(dca_categories)}",
+            'calculable': True
+        })
+    else:
+        scores['crypto']['details'].append({
+            'critere': 'DCA tous les mois/semaines',
             'score': 0,
-            'max': max_pts,
+            'max': 1,
             'obtenu': False,
-            'explication': 'À renseigner manuellement',
-            'calculable': False
+            'explication': 'Aucune sortie contenant "Bitcoin", "Ethereum" ou "Crypto" détectée',
+            'calculable': True
         })
 
     # ========================================================================

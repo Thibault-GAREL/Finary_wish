@@ -538,13 +538,14 @@ def plot_sankey_diagram(data: dict) -> go.Figure:
     return fig
 
 
-def calculate_financial_score(data: dict, user_params: dict) -> dict:
+def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -> dict:
     """
     Calcule le score financier global basé sur différents critères.
 
     Args:
         data: Données financières du mois
         user_params: Paramètres additionnels fournis par l'utilisateur
+        df: DataFrame complet avec toutes les données historiques
 
     Returns:
         Dictionnaire contenant tous les scores et détails
@@ -563,7 +564,8 @@ def calculate_financial_score(data: dict, user_params: dict) -> dict:
     # ========================================================================
 
     # 1. Gagner plus que ce qu'on ne dépense (20 points)
-    total_depenses = data['total_sorties'] + data['total_epargne']
+    # Note: L'épargne n'est PAS considérée comme une dépense
+    total_depenses = data['total_sorties']
     if data['total_entrees'] > total_depenses:
         scores['budget']['score'] += 20
         scores['budget']['details'].append({
@@ -571,7 +573,7 @@ def calculate_financial_score(data: dict, user_params: dict) -> dict:
             'score': 20,
             'max': 20,
             'obtenu': True,
-            'explication': f"Entrées ({data['total_entrees']:.0f}€) > Dépenses+Épargne ({total_depenses:.0f}€)",
+            'explication': f"Entrées ({data['total_entrees']:.0f}€) > Dépenses ({total_depenses:.0f}€)",
             'calculable': True
         })
     else:
@@ -580,7 +582,7 @@ def calculate_financial_score(data: dict, user_params: dict) -> dict:
             'score': 0,
             'max': 20,
             'obtenu': False,
-            'explication': f"Entrées ({data['total_entrees']:.0f}€) ≤ Dépenses+Épargne ({total_depenses:.0f}€)",
+            'explication': f"Entrées ({data['total_entrees']:.0f}€) ≤ Dépenses ({total_depenses:.0f}€)",
             'calculable': True
         })
 
@@ -593,7 +595,7 @@ def calculate_financial_score(data: dict, user_params: dict) -> dict:
             'score': 20,
             'max': 20,
             'obtenu': True,
-            'explication': f"Taux d'épargne: {data['taux_epargne']:.1f}% (≥{taux_epargne_minimal}%)",
+            'explication': f"Épargne ({data['total_epargne']:.0f}€) / Entrées ({data['total_entrees']:.0f}€) × 100 = {data['taux_epargne']:.1f}% (≥{taux_epargne_minimal}%)",
             'calculable': True
         })
     else:
@@ -604,7 +606,7 @@ def calculate_financial_score(data: dict, user_params: dict) -> dict:
             'score': score_partiel,
             'max': 20,
             'obtenu': False,
-            'explication': f"Taux d'épargne: {data['taux_epargne']:.1f}% (<{taux_epargne_minimal}%) = {score_partiel}/20 pts",
+            'explication': f"Épargne ({data['total_epargne']:.0f}€) / Entrées ({data['total_entrees']:.0f}€) × 100 = {data['taux_epargne']:.1f}% (<{taux_epargne_minimal}%) = {score_partiel}/20 pts",
             'calculable': True
         })
 
@@ -612,47 +614,57 @@ def calculate_financial_score(data: dict, user_params: dict) -> dict:
     # MATELAS DE SÉCURITÉ (15 points)
     # ========================================================================
 
-    if 'epargne_totale' in user_params and user_params['epargne_totale'] is not None:
-        mois_couverture = user_params['epargne_totale'] / data['total_sorties'] if data['total_sorties'] > 0 else 0
-        if mois_couverture >= 3 and mois_couverture <= 6:
-            scores['matelas']['score'] = 15
-            scores['matelas']['details'].append({
-                'critere': '3 à 6 mois de dépenses en épargne',
-                'score': 15,
-                'max': 15,
-                'obtenu': True,
-                'explication': f"Épargne totale: {user_params['epargne_totale']:.0f}€ = {mois_couverture:.1f} mois de dépenses",
-                'calculable': True
-            })
-        elif mois_couverture > 6:
-            scores['matelas']['score'] = 12
-            scores['matelas']['details'].append({
-                'critere': '3 à 6 mois de dépenses en épargne',
-                'score': 12,
-                'max': 15,
-                'obtenu': False,
-                'explication': f"Épargne totale: {user_params['epargne_totale']:.0f}€ = {mois_couverture:.1f} mois (>6, peut-être trop liquide)",
-                'calculable': True
-            })
-        else:
-            score_partiel = int((mois_couverture / 3) * 15)
-            scores['matelas']['score'] = min(score_partiel, 15)
-            scores['matelas']['details'].append({
-                'critere': '3 à 6 mois de dépenses en épargne',
-                'score': score_partiel,
-                'max': 15,
-                'obtenu': False,
-                'explication': f"Épargne totale: {user_params['epargne_totale']:.0f}€ = {mois_couverture:.1f} mois (<3 mois)",
-                'calculable': True
-            })
-    else:
+    # Calculer automatiquement l'épargne totale accumulée et la moyenne des dépenses
+    # 1. Récupérer tous les mois disponibles
+    month_columns = [col for col in df.columns if col not in ['Catégorie', 'Type']]
+
+    # 2. Calculer l'épargne totale accumulée (somme de toutes les épargnes de tous les mois)
+    epargne_rows = df[df['Type'] == 'Épargne']
+    epargne_totale_accumulee = 0
+    for month_col in month_columns:
+        epargne_totale_accumulee += epargne_rows[month_col].sum()
+
+    # 3. Calculer la moyenne des dépenses mensuelles (sorties uniquement)
+    sorties_rows = df[df['Type'] == 'Sortie']
+    depenses_mensuelles = []
+    for month_col in month_columns:
+        depenses_mensuelles.append(sorties_rows[month_col].sum())
+    moyenne_depenses = sum(depenses_mensuelles) / len(depenses_mensuelles) if depenses_mensuelles else 0
+
+    # 4. Calculer le nombre de mois de couverture
+    mois_couverture = epargne_totale_accumulee / moyenne_depenses if moyenne_depenses > 0 else 0
+
+    # 5. Attribuer le score en fonction du nombre de mois
+    if mois_couverture >= 3 and mois_couverture <= 6:
+        scores['matelas']['score'] = 15
         scores['matelas']['details'].append({
             'critere': '3 à 6 mois de dépenses en épargne',
-            'score': 0,
+            'score': 15,
+            'max': 15,
+            'obtenu': True,
+            'explication': f"Épargne accumulée ({epargne_totale_accumulee:.0f}€) / Moyenne dépenses ({moyenne_depenses:.0f}€/mois) = {mois_couverture:.1f} mois",
+            'calculable': True
+        })
+    elif mois_couverture > 6:
+        scores['matelas']['score'] = 12
+        scores['matelas']['details'].append({
+            'critere': '3 à 6 mois de dépenses en épargne',
+            'score': 12,
             'max': 15,
             'obtenu': False,
-            'explication': 'Renseignez votre épargne totale dans la sidebar',
-            'calculable': False
+            'explication': f"Épargne accumulée ({epargne_totale_accumulee:.0f}€) / Moyenne dépenses ({moyenne_depenses:.0f}€/mois) = {mois_couverture:.1f} mois (>6, peut-être trop liquide)",
+            'calculable': True
+        })
+    else:
+        score_partiel = int((mois_couverture / 3) * 15)
+        scores['matelas']['score'] = min(score_partiel, 15)
+        scores['matelas']['details'].append({
+            'critere': '3 à 6 mois de dépenses en épargne',
+            'score': score_partiel,
+            'max': 15,
+            'obtenu': False,
+            'explication': f"Épargne accumulée ({epargne_totale_accumulee:.0f}€) / Moyenne dépenses ({moyenne_depenses:.0f}€/mois) = {mois_couverture:.1f} mois (<3 mois)",
+            'calculable': True
         })
 
     # ========================================================================
@@ -1141,7 +1153,7 @@ def main():
         st.markdown("---")
 
         # Score financier
-        scores = calculate_financial_score(month_data, user_params)
+        scores = calculate_financial_score(month_data, user_params, df)
         display_financial_score(scores)
 
     # ========================================================================
@@ -1227,12 +1239,12 @@ def main():
 
         with col1:
             st.markdown(f"**{selected_month}**")
-            scores1 = calculate_financial_score(month_data, user_params)
+            scores1 = calculate_financial_score(month_data, user_params, df)
             display_financial_score(scores1)
 
         with col2:
             st.markdown(f"**{selected_month2}**")
-            scores2 = calculate_financial_score(month_data2, user_params)
+            scores2 = calculate_financial_score(month_data2, user_params, df)
             display_financial_score(scores2)
 
     # ========================================================================

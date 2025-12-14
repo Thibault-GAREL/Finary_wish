@@ -114,6 +114,196 @@ def get_month_data(df: pd.DataFrame, month: str) -> dict:
     }
 
 
+def get_all_categories(df: pd.DataFrame) -> list:
+    """
+    Extrait la liste de toutes les catégories avec leur type.
+
+    Args:
+        df: DataFrame avec les données financières
+
+    Returns:
+        Liste de tuples (catégorie, type)
+    """
+    categories = []
+    for _, row in df.iterrows():
+        categories.append((row['Catégorie'], row['Type']))
+    return categories
+
+
+def get_category_evolution(df: pd.DataFrame, category: str) -> dict:
+    """
+    Récupère l'évolution d'une catégorie sur tous les mois.
+
+    Args:
+        df: DataFrame avec les données financières
+        category: Nom de la catégorie
+
+    Returns:
+        Dictionnaire avec l'évolution et les statistiques
+    """
+    # Trouver la ligne de la catégorie
+    cat_row = df[df['Catégorie'] == category]
+
+    if cat_row.empty:
+        return None
+
+    # Extraire le type
+    cat_type = cat_row['Type'].values[0]
+
+    # Extraire les mois et valeurs
+    months = [col for col in df.columns if col not in ['Catégorie', 'Type']]
+    values = []
+
+    for month in months:
+        values.append(cat_row[month].values[0])
+
+    # Calculer les statistiques
+    values_array = pd.Series(values)
+    stats = {
+        'min': values_array.min(),
+        'max': values_array.max(),
+        'mean': values_array.mean(),
+        'median': values_array.median(),
+        'std': values_array.std(),
+        'total': values_array.sum()
+    }
+
+    return {
+        'category': category,
+        'type': cat_type,
+        'months': months,
+        'values': values,
+        'stats': stats
+    }
+
+
+def plot_category_evolution(evolution_data: dict) -> go.Figure:
+    """
+    Crée un graphique d'évolution pour une catégorie.
+
+    Args:
+        evolution_data: Données d'évolution de la catégorie
+
+    Returns:
+        Figure Plotly
+    """
+    months = evolution_data['months']
+    values = evolution_data['values']
+    category = evolution_data['category']
+    cat_type = evolution_data['type']
+
+    # Couleur selon le type
+    color_map = {
+        'Entrée': '#228B22',  # Vert
+        'Sortie': '#DC143C',  # Rouge
+        'Épargne': '#1E90FF'  # Bleu
+    }
+    color = color_map.get(cat_type, '#808080')
+
+    fig = go.Figure()
+
+    # Ligne d'évolution
+    fig.add_trace(go.Scatter(
+        x=months,
+        y=values,
+        mode='lines+markers',
+        name=category,
+        line=dict(color=color, width=3),
+        marker=dict(size=8, color=color),
+        hovertemplate='%{x}<br>%{y:.2f} €<extra></extra>'
+    ))
+
+    # Ligne de moyenne
+    mean_value = evolution_data['stats']['mean']
+    fig.add_trace(go.Scatter(
+        x=months,
+        y=[mean_value] * len(months),
+        mode='lines',
+        name='Moyenne',
+        line=dict(color='gray', width=2, dash='dash'),
+        hovertemplate=f'Moyenne: {mean_value:.2f} €<extra></extra>'
+    ))
+
+    fig.update_layout(
+        title=f"Évolution de '{category}' ({cat_type})",
+        xaxis_title="Mois",
+        yaxis_title="Montant (€)",
+        height=500,
+        hovermode='x unified',
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+
+    return fig
+
+
+def display_category_stats(evolution_data: dict):
+    """
+    Affiche les statistiques d'une catégorie.
+
+    Args:
+        evolution_data: Données d'évolution de la catégorie
+    """
+    stats = evolution_data['stats']
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    with col1:
+        st.metric(
+            label="📉 Minimum",
+            value=f"{stats['min']:.2f} €"
+        )
+
+    with col2:
+        st.metric(
+            label="📈 Maximum",
+            value=f"{stats['max']:.2f} €"
+        )
+
+    with col3:
+        st.metric(
+            label="📊 Moyenne",
+            value=f"{stats['mean']:.2f} €"
+        )
+
+    with col4:
+        st.metric(
+            label="📍 Médiane",
+            value=f"{stats['median']:.2f} €"
+        )
+
+    with col5:
+        st.metric(
+            label="📊 Écart-type",
+            value=f"{stats['std']:.2f} €"
+        )
+
+    # Statistiques additionnelles
+    st.markdown("---")
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        variation = stats['max'] - stats['min']
+        st.metric(
+            label="🔄 Variation (max-min)",
+            value=f"{variation:.2f} €"
+        )
+
+    with col2:
+        if stats['mean'] > 0:
+            volatilite = (stats['std'] / stats['mean']) * 100
+            st.metric(
+                label="📈 Volatilité",
+                value=f"{volatilite:.1f}%"
+            )
+
+    with col3:
+        st.metric(
+            label="💰 Total cumulé",
+            value=f"{stats['total']:.2f} €"
+        )
+
+
 # ============================================================================
 # FONCTIONS DE VISUALISATION
 # ============================================================================
@@ -849,38 +1039,63 @@ def main():
         st.error("❌ Aucun mois trouvé dans les données.")
         st.stop()
 
-    # Mode de visualisation
+    # Navigation principale
     st.sidebar.markdown("---")
-    view_mode = st.sidebar.radio(
-        "🔍 Mode de visualisation",
-        options=["📊 Vue Simple", "⚖️ Comparaison"],
+    st.sidebar.markdown("### 📂 Navigation")
+    page = st.sidebar.radio(
+        "Choisissez une vue :",
+        options=[
+            "📊 Tableau de bord - Vue Simplifiée",
+            "⚖️ Tableau de bord - Comparaison",
+            "📈 Évolution d'une Catégorie"
+        ],
         index=0
     )
 
     st.sidebar.markdown("---")
 
-    # Sélection des mois selon le mode
-    if view_mode == "📊 Vue Simple":
+    # Sélection des paramètres selon la page
+    if page == "📊 Tableau de bord - Vue Simplifiée":
+        st.sidebar.markdown("### 📅 Sélection")
         selected_month = st.sidebar.selectbox(
-            "📅 Sélectionnez un mois",
+            "Choisissez un mois :",
             options=available_months,
             index=len(available_months) - 1  # Dernier mois par défaut
         )
         selected_month2 = None
-    else:
+        selected_category = None
+
+    elif page == "⚖️ Tableau de bord - Comparaison":
+        st.sidebar.markdown("### 📅 Sélection des mois")
         col_m1, col_m2 = st.sidebar.columns(2)
         with col_m1:
             selected_month = st.selectbox(
-                "📅 Mois 1",
+                "Mois 1 :",
                 options=available_months,
                 index=max(0, len(available_months) - 2)  # Avant-dernier mois
             )
         with col_m2:
             selected_month2 = st.selectbox(
-                "📅 Mois 2",
+                "Mois 2 :",
                 options=available_months,
                 index=len(available_months) - 1  # Dernier mois
             )
+        selected_category = None
+
+    else:  # Évolution d'une catégorie
+        st.sidebar.markdown("### 🏷️ Sélection de catégorie")
+        all_categories = get_all_categories(df)
+        category_options = [f"{cat} ({typ})" for cat, typ in all_categories]
+
+        selected_category_full = st.sidebar.selectbox(
+            "Choisissez une catégorie :",
+            options=category_options,
+            index=0
+        )
+        # Extraire le nom de la catégorie
+        selected_category = selected_category_full.split(" (")[0]
+        selected_month = None
+        selected_month2 = None
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 📊 Informations")
@@ -891,27 +1106,43 @@ def main():
 
     # Paramètres pour le score financier
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🎯 Paramètres Score Financier")
+    st.sidebar.markdown("### 🎯 Score Financier")
+
+    with st.sidebar.expander("ℹ️ Qu'est-ce que l'épargne totale ?", expanded=False):
+        st.markdown("""
+        **Épargne totale accumulée** : Montant total de votre épargne de sécurité.
+
+        **Pourquoi ?**
+        - Calcule votre matelas de sécurité
+        - Vérifie si vous avez 3-6 mois de dépenses en réserve
+        - Important pour votre score financier
+
+        **Exemple :**
+        ```
+        Épargne totale : 15 000 €
+        Dépenses/mois : 2 500 €
+        → 6 mois de couverture ✅
+        ```
+        """)
 
     epargne_totale = st.sidebar.number_input(
-        "💰 Épargne totale accumulée (€)",
+        "💰 Épargne totale (€)",
         min_value=0.0,
         value=0.0,
         step=100.0,
-        help="Montant total de votre épargne de sécurité (Livret A, etc.)"
+        help="Montant total de votre épargne liquide (Livret A, Livret LDD, etc.)"
     )
 
     user_params = {
         'epargne_totale': epargne_totale if epargne_totale > 0 else None
     }
 
-    # Récupérer les données du/des mois sélectionné(s)
-    month_data = get_month_data(df, selected_month)
-
     # ========================================================================
-    # MODE VUE SIMPLE
+    # PAGE 1 : VUE SIMPLIFIÉE
     # ========================================================================
-    if view_mode == "📊 Vue Simple":
+    if page == "📊 Tableau de bord - Vue Simplifiée":
+        # Récupérer les données du mois sélectionné
+        month_data = get_month_data(df, selected_month)
         # Afficher le mois sélectionné
         st.markdown(f"## 📅 Mois sélectionné: **{selected_month}**")
         st.markdown("---")
@@ -977,9 +1208,9 @@ def main():
         display_financial_score(scores)
 
     # ========================================================================
-    # MODE COMPARAISON
+    # PAGE 2 : COMPARAISON
     # ========================================================================
-    else:
+    elif page == "⚖️ Tableau de bord - Comparaison":
         month_data2 = get_month_data(df, selected_month2)
 
         # Afficher les mois comparés
@@ -1044,6 +1275,115 @@ def main():
             st.markdown(f"**{selected_month2}**")
             scores2 = calculate_financial_score(month_data2, user_params)
             display_financial_score(scores2)
+
+    # ========================================================================
+    # PAGE 3 : ÉVOLUTION D'UNE CATÉGORIE
+    # ========================================================================
+    else:  # page == "📈 Évolution d'une Catégorie"
+        # Afficher le titre
+        evolution_data = get_category_evolution(df, selected_category)
+
+        if evolution_data is None:
+            st.error(f"❌ Catégorie '{selected_category}' introuvable.")
+            st.stop()
+
+        cat_type = evolution_data['type']
+        type_emoji = {
+            'Entrée': '💰',
+            'Sortie': '💸',
+            'Épargne': '🏦'
+        }
+        emoji = type_emoji.get(cat_type, '📊')
+
+        st.markdown(f"## {emoji} Évolution : **{selected_category}**")
+        st.markdown(f"*Type : {cat_type}*")
+        st.markdown("---")
+
+        # Statistiques
+        st.markdown("### 📊 Statistiques Globales")
+        display_category_stats(evolution_data)
+
+        st.markdown("---")
+
+        # Graphique d'évolution
+        st.markdown("### 📈 Graphique d'Évolution")
+        fig_evolution = plot_category_evolution(evolution_data)
+        st.plotly_chart(fig_evolution, use_container_width=True)
+
+        st.markdown("---")
+
+        # Tableau détaillé
+        st.markdown("### 📋 Détails Mensuels")
+        months = evolution_data['months']
+        values = evolution_data['values']
+
+        # Créer un DataFrame pour l'affichage
+        detail_df = pd.DataFrame({
+            'Mois': months,
+            'Montant (€)': values
+        })
+
+        # Ajouter des colonnes calculées
+        detail_df['Variation (€)'] = detail_df['Montant (€)'].diff()
+        detail_df['Variation (%)'] = detail_df['Montant (€)'].pct_change() * 100
+
+        # Formater et afficher
+        st.dataframe(
+            detail_df.style.format({
+                'Montant (€)': '{:.2f}',
+                'Variation (€)': '{:+.2f}',
+                'Variation (%)': '{:+.1f}%'
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # Analyses supplémentaires
+        st.markdown("---")
+        st.markdown("### 🔍 Analyse de Tendance")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            # Tendance générale
+            first_value = values[0]
+            last_value = values[-1]
+            variation_totale = last_value - first_value
+            variation_pct = (variation_totale / first_value * 100) if first_value > 0 else 0
+
+            if variation_totale > 0:
+                trend_emoji = "📈"
+                trend_text = "Hausse"
+                trend_color = "green" if cat_type == "Entrée" or cat_type == "Épargne" else "red"
+            elif variation_totale < 0:
+                trend_emoji = "📉"
+                trend_text = "Baisse"
+                trend_color = "red" if cat_type == "Entrée" or cat_type == "Épargne" else "green"
+            else:
+                trend_emoji = "➡️"
+                trend_text = "Stable"
+                trend_color = "gray"
+
+            st.markdown(f"""
+            **Tendance globale :** {trend_emoji} {trend_text}
+
+            - **Premier mois :** {first_value:.2f} € ({months[0]})
+            - **Dernier mois :** {last_value:.2f} € ({months[-1]})
+            - **Variation :** <span style='color:{trend_color}; font-weight:bold'>{variation_totale:+.2f} € ({variation_pct:+.1f}%)</span>
+            """, unsafe_allow_html=True)
+
+        with col2:
+            # Mois min et max
+            min_idx = values.index(min(values))
+            max_idx = values.index(max(values))
+
+            st.markdown(f"""
+            **Extrêmes :**
+
+            - **📉 Minimum :** {min(values):.2f} € en {months[min_idx]}
+            - **📈 Maximum :** {max(values):.2f} € en {months[max_idx]}
+            - **🔄 Amplitude :** {max(values) - min(values):.2f} €
+            """)
 
     # Footer
     st.markdown("---")

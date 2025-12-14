@@ -1054,35 +1054,8 @@ def main():
 
     st.sidebar.markdown("---")
 
-    # Sélection des paramètres selon la page
-    if page == "📊 Tableau de bord - Vue Simplifiée":
-        st.sidebar.markdown("### 📅 Sélection")
-        selected_month = st.sidebar.selectbox(
-            "Choisissez un mois :",
-            options=available_months,
-            index=len(available_months) - 1  # Dernier mois par défaut
-        )
-        selected_month2 = None
-        selected_category = None
-
-    elif page == "⚖️ Tableau de bord - Comparaison":
-        st.sidebar.markdown("### 📅 Sélection des mois")
-        col_m1, col_m2 = st.sidebar.columns(2)
-        with col_m1:
-            selected_month = st.selectbox(
-                "Mois 1 :",
-                options=available_months,
-                index=max(0, len(available_months) - 2)  # Avant-dernier mois
-            )
-        with col_m2:
-            selected_month2 = st.selectbox(
-                "Mois 2 :",
-                options=available_months,
-                index=len(available_months) - 1  # Dernier mois
-            )
-        selected_category = None
-
-    else:  # Évolution d'une catégorie
+    # Sélection de catégorie uniquement pour la page évolution
+    if page == "📈 Évolution d'une Catégorie":
         st.sidebar.markdown("### 🏷️ Sélection de catégorie")
         all_categories = get_all_categories(df)
         category_options = [f"{cat} ({typ})" for cat, typ in all_categories]
@@ -1094,58 +1067,40 @@ def main():
         )
         # Extraire le nom de la catégorie
         selected_category = selected_category_full.split(" (")[0]
-        selected_month = None
-        selected_month2 = None
+        st.sidebar.markdown("---")
+    else:
+        selected_category = None
 
-    st.sidebar.markdown("---")
+    # Informations générales
     st.sidebar.markdown("### 📊 Informations")
     st.sidebar.info(
         f"**Catégories totales:** {len(df)}\n\n"
         f"**Mois disponibles:** {len(available_months)}"
     )
 
-    # Paramètres pour le score financier
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🎯 Score Financier")
-
-    with st.sidebar.expander("ℹ️ Qu'est-ce que l'épargne totale ?", expanded=False):
-        st.markdown("""
-        **Épargne totale accumulée** : Montant total de votre épargne de sécurité.
-
-        **Pourquoi ?**
-        - Calcule votre matelas de sécurité
-        - Vérifie si vous avez 3-6 mois de dépenses en réserve
-        - Important pour votre score financier
-
-        **Exemple :**
-        ```
-        Épargne totale : 15 000 €
-        Dépenses/mois : 2 500 €
-        → 6 mois de couverture ✅
-        ```
-        """)
-
-    epargne_totale = st.sidebar.number_input(
-        "💰 Épargne totale (€)",
-        min_value=0.0,
-        value=0.0,
-        step=100.0,
-        help="Montant total de votre épargne liquide (Livret A, Livret LDD, etc.)"
-    )
-
-    user_params = {
-        'epargne_totale': epargne_totale if epargne_totale > 0 else None
-    }
-
     # ========================================================================
     # PAGE 1 : VUE SIMPLIFIÉE
     # ========================================================================
     if page == "📊 Tableau de bord - Vue Simplifiée":
+        st.markdown("## 📊 Tableau de bord - Vue Simplifiée")
+
+        # Sélecteur de mois dans la page
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            selected_month = st.selectbox(
+                "📅 Sélectionnez un mois :",
+                options=available_months,
+                index=len(available_months) - 1,  # Dernier mois par défaut
+                key="month_simple"
+            )
+
+        st.markdown("---")
+
         # Récupérer les données du mois sélectionné
         month_data = get_month_data(df, selected_month)
-        # Afficher le mois sélectionné
-        st.markdown(f"## 📅 Mois sélectionné: **{selected_month}**")
-        st.markdown("---")
+
+        # Paramètres pour le score (dans la page)
+        user_params = {'epargne_totale': None}
 
         # Afficher les métriques clés
         display_metrics(month_data)
@@ -1211,11 +1166,35 @@ def main():
     # PAGE 2 : COMPARAISON
     # ========================================================================
     elif page == "⚖️ Tableau de bord - Comparaison":
+        st.markdown("## ⚖️ Tableau de bord - Comparaison")
+
+        # Sélecteurs de mois dans la page
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col1:
+            st.markdown("")  # Espaceur
+        with col2:
+            selected_month = st.selectbox(
+                "📅 Mois 1 :",
+                options=available_months,
+                index=max(0, len(available_months) - 2),  # Avant-dernier mois
+                key="month_comp_1"
+            )
+        with col3:
+            selected_month2 = st.selectbox(
+                "📅 Mois 2 :",
+                options=available_months,
+                index=len(available_months) - 1,  # Dernier mois
+                key="month_comp_2"
+            )
+
+        st.markdown("---")
+
+        # Récupérer les données des deux mois
+        month_data = get_month_data(df, selected_month)
         month_data2 = get_month_data(df, selected_month2)
 
-        # Afficher les mois comparés
-        st.markdown(f"## ⚖️ Comparaison: **{selected_month}** vs **{selected_month2}**")
-        st.markdown("---")
+        # Paramètres pour le score (dans la page)
+        user_params = {'epargne_totale': None}
 
         # Métriques de comparaison
         display_comparison_metrics(month_data, month_data2, selected_month, selected_month2)

@@ -442,38 +442,52 @@ def plot_sankey_diagram(data: dict) -> go.Figure:
     targets = []  # Indices des nœuds cibles
     values = []  # Montants des flux
     colors = []  # Couleurs des liens
+    x_positions = []  # Positions X des nœuds (0 à 1)
+    y_positions = []  # Positions Y des nœuds (0 à 1)
 
     # Couleurs personnalisées
     color_entrees = 'rgba(34, 139, 34, 0.4)'  # Vert pour les entrées
     color_sorties = 'rgba(255, 99, 71, 0.4)'  # Rouge pour les sorties
     color_epargne = 'rgba(65, 105, 225, 0.4)'  # Bleu pour l'épargne
+    color_marge = 'rgba(147, 51, 234, 0.4)'  # Violet pour la marge non épargnée
 
     # Index des nœuds
     current_index = 0
 
     # 1. Ajouter les nœuds d'entrées avec montants
     entrees_start_idx = current_index
-    for _, row in data['entrees'].iterrows():
+    nb_entrees = len(data['entrees'])
+    for idx, (_, row) in enumerate(data['entrees'].iterrows()):
         labels.append(f"{row['Catégorie']}<br>{row['Montant']:.0f} €")
+        x_positions.append(0.01)  # Gauche du diagramme
+        y_positions.append(idx / max(nb_entrees - 1, 1))  # Répartir verticalement
         current_index += 1
     entrees_end_idx = current_index
 
     # 2. Ajouter le nœud central "Total Entrées"
     total_entrees_idx = current_index
     labels.append(f"💰 Total<br>{data['total_entrees']:.0f} €")
+    x_positions.append(0.4)  # Centre du diagramme
+    y_positions.append(0.5)  # Milieu vertical
     current_index += 1
 
     # 3. Ajouter les nœuds de sorties avec montants
     sorties_start_idx = current_index
-    for _, row in data['sorties'].iterrows():
+    nb_sorties = len(data['sorties'])
+    for idx, (_, row) in enumerate(data['sorties'].iterrows()):
         labels.append(f"{row['Catégorie']}<br>{row['Montant']:.0f} €")
+        x_positions.append(0.99)  # Droite du diagramme
+        y_positions.append(idx / max(nb_sorties - 1, 1) * 0.4)  # Haut du diagramme (0-40%)
         current_index += 1
     sorties_end_idx = current_index
 
     # 4. Ajouter les nœuds d'épargne avec montants
     epargne_start_idx = current_index
-    for _, row in data['epargne'].iterrows():
+    nb_epargne = len(data['epargne'])
+    for idx, (_, row) in enumerate(data['epargne'].iterrows()):
         labels.append(f"{row['Catégorie']}<br>{row['Montant']:.0f} €")
+        x_positions.append(0.99)  # Droite du diagramme
+        y_positions.append(0.45 + idx / max(nb_epargne - 1, 1) * 0.3)  # Milieu du diagramme (45-75%)
         current_index += 1
     epargne_end_idx = current_index
 
@@ -483,6 +497,8 @@ def plot_sankey_diagram(data: dict) -> go.Figure:
     if marge_non_epargnee > 0:
         marge_idx = current_index
         labels.append(f"💎 Marge non épargnée<br>{marge_non_epargnee:.0f} €")
+        x_positions.append(0.99)  # Droite du diagramme
+        y_positions.append(0.95)  # Tout en bas (95%)
         current_index += 1
 
     # Créer les liens : Entrées -> Total Entrées
@@ -511,7 +527,7 @@ def plot_sankey_diagram(data: dict) -> go.Figure:
         sources.append(total_entrees_idx)
         targets.append(marge_idx)
         values.append(marge_non_epargnee)
-        colors.append(color_epargne)  # Bleu comme l'épargne
+        colors.append(color_marge)  # Violet pour la marge
 
     # Créer le diagramme de Sankey
     fig = go.Figure(data=[go.Sankey(
@@ -520,11 +536,13 @@ def plot_sankey_diagram(data: dict) -> go.Figure:
             thickness=25,
             line=dict(color='white', width=2),
             label=labels,
+            x=x_positions,
+            y=y_positions,
             color=['#228B22' if i < entrees_end_idx  # Vert foncé pour entrées
                    else '#FFA500' if i == total_entrees_idx  # Orange pour le nœud central
                    else '#DC143C' if sorties_start_idx <= i < sorties_end_idx  # Rouge foncé pour sorties
                    else '#1E90FF' if epargne_start_idx <= i < epargne_end_idx  # Bleu foncé pour épargne
-                   else '#1E90FF' if marge_idx is not None and i == marge_idx  # Bleu pour marge non épargnée
+                   else '#9333EA' if marge_idx is not None and i == marge_idx  # Violet pour marge non épargnée
                    else '#808080'  # Gris par défaut
                    for i in range(len(labels))],
             customdata=[f'{i}' for i in range(len(labels))],

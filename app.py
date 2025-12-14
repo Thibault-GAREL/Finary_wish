@@ -814,10 +814,32 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
             'calculable': True
         })
 
+    # 5. Frais au plancher (2 points) - Auto-détecté
+    has_frais = any(cat.startswith('Frais au plancher') for cat in epargne_categories)
+    if has_frais:
+        scores['bourse']['score'] += 2
+        frais_categories = [cat for cat in epargne_categories if cat.startswith('Frais au plancher')]
+        scores['bourse']['details'].append({
+            'critere': 'Frais au plancher',
+            'score': 2,
+            'max': 2,
+            'obtenu': True,
+            'explication': f"Détecté: {', '.join(frais_categories)}",
+            'calculable': True
+        })
+    else:
+        scores['bourse']['details'].append({
+            'critere': 'Frais au plancher',
+            'score': 0,
+            'max': 2,
+            'obtenu': False,
+            'explication': 'Aucune catégorie "Frais au plancher" détectée',
+            'calculable': True
+        })
+
     # Critères manuels restants
     bourse_criteres_manuels = [
         ('Minimum d\'overlap entre les ETFs', 1),
-        ('Frais au plancher', 2),
         ('DCA tous les mois', 3),
         ('Si stock-picking, pas plus de 20%', 1),
         ('Prise de date sur Assurance Vie', 1)

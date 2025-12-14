@@ -87,6 +87,7 @@ def generate_finance_data(start_date: str = '2024-01', num_months: int = 12) -> 
         {'Catégorie': 'Assurances', 'Type': 'Sortie', 'base': 95, 'variation': 0.0},
         {'Catégorie': 'Téléphone/Internet', 'Type': 'Sortie', 'base': 45, 'variation': 0.0},
         {'Catégorie': 'Impôts', 'Type': 'Sortie', 'base': 180, 'variation': 0.1},
+        {'Catégorie': 'Frais au plancher PEA', 'Type': 'Sortie', 'base': 5, 'variation': 0.0},
 
         # ÉPARGNE
         {'Catégorie': 'Livret A', 'Type': 'Épargne', 'base': 300, 'variation': 0.15},

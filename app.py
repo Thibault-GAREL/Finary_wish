@@ -840,16 +840,21 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
             'calculable': True
         })
 
-    # 6. DCA tous les mois (3 points) - Auto-détecté si PEA et CTO présents
-    has_dca = has_pea and has_cto
+    # 6. DCA tous les mois (3 points) - Auto-détecté si PEA ou CTO présents
+    has_dca = has_pea or has_cto
     if has_dca:
         scores['bourse']['score'] += 3
+        detected_accounts = []
+        if has_pea:
+            detected_accounts.append('PEA')
+        if has_cto:
+            detected_accounts.append('CTO')
         scores['bourse']['details'].append({
             'critere': 'DCA tous les mois',
             'score': 3,
             'max': 3,
             'obtenu': True,
-            'explication': 'PEA et CTO détectés, DCA probable',
+            'explication': f"{' et '.join(detected_accounts)} détecté(s), DCA probable",
             'calculable': True
         })
     else:
@@ -858,7 +863,7 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
             'score': 0,
             'max': 3,
             'obtenu': False,
-            'explication': 'PEA et CTO nécessaires pour validation automatique',
+            'explication': 'PEA ou CTO nécessaire pour validation automatique',
             'calculable': True
         })
 

@@ -103,6 +103,8 @@ def generate_finance_data(start_date: str = '2024-01', num_months: int = 12) -> 
         {'Catégorie': 'PEA (valorisation)', 'Type': 'Patrimoine', 'base': 12000, 'variation': 0.1},
         {'Catégorie': 'CTO (valorisation)', 'Type': 'Patrimoine', 'base': 8000, 'variation': 0.12},
         {'Catégorie': 'Assurance Vie Linxea', 'Type': 'Patrimoine', 'base': 25000, 'variation': 0.08},
+        {'Catégorie': 'Bitcoin (BTC)', 'Type': 'Patrimoine', 'base': 3500, 'variation': 0.2},
+        {'Catégorie': 'Ethereum (ETH)', 'Type': 'Patrimoine', 'base': 1800, 'variation': 0.25},
         {'Catégorie': 'Véhicule', 'Type': 'Patrimoine', 'base': 15000, 'variation': 0.05},
     ]
 

@@ -963,13 +963,60 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
     # CRYPTO (4 points)
     # ========================================================================
 
-    crypto_criteres = [
-        ('Bitcoin', 2),
-        ('Ethereum', 1),
+    # patrimoine_categories déjà récupéré plus haut pour Assurance Vie
+
+    # 1. Bitcoin (2 points) - Auto-détecté dans le PATRIMOINE
+    has_bitcoin = any('BITCOIN' in cat.upper() or 'BTC' in cat.upper() for cat in patrimoine_categories)
+    if has_bitcoin:
+        scores['crypto']['score'] += 2
+        bitcoin_categories = [cat for cat in patrimoine_categories if 'BITCOIN' in cat.upper() or 'BTC' in cat.upper()]
+        scores['crypto']['details'].append({
+            'critere': 'Bitcoin',
+            'score': 2,
+            'max': 2,
+            'obtenu': True,
+            'explication': f"Détecté dans patrimoine: {', '.join(bitcoin_categories)}",
+            'calculable': True
+        })
+    else:
+        scores['crypto']['details'].append({
+            'critere': 'Bitcoin',
+            'score': 0,
+            'max': 2,
+            'obtenu': False,
+            'explication': 'Aucune catégorie contenant "Bitcoin" ou "BTC" détectée dans le patrimoine',
+            'calculable': True
+        })
+
+    # 2. Ethereum (1 point) - Auto-détecté dans le PATRIMOINE
+    has_ethereum = any('ETHEREUM' in cat.upper() or 'ETH' in cat.upper() for cat in patrimoine_categories)
+    if has_ethereum:
+        scores['crypto']['score'] += 1
+        ethereum_categories = [cat for cat in patrimoine_categories if 'ETHEREUM' in cat.upper() or 'ETH' in cat.upper()]
+        scores['crypto']['details'].append({
+            'critere': 'Ethereum',
+            'score': 1,
+            'max': 1,
+            'obtenu': True,
+            'explication': f"Détecté dans patrimoine: {', '.join(ethereum_categories)}",
+            'calculable': True
+        })
+    else:
+        scores['crypto']['details'].append({
+            'critere': 'Ethereum',
+            'score': 0,
+            'max': 1,
+            'obtenu': False,
+            'explication': 'Aucune catégorie contenant "Ethereum" ou "ETH" détectée dans le patrimoine',
+            'calculable': True
+        })
+
+    # Critères manuels restants
+    crypto_criteres_manuels = [
         ('DCA tous les mois/semaines', 1)
     ]
 
-    for critere, max_pts in crypto_criteres:
+    for critere, max_pts in crypto_criteres_manuels:
         scores['crypto']['details'].append({
             'critere': critere,
             'score': 0,

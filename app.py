@@ -918,12 +918,38 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
     # IMMOBILIER (10 points)
     # ========================================================================
 
-    immo_criteres = [
-        ('Si achat > Effet de levier', 5),
-        ('Immobilier locatif', 5)
+    # Récupérer les catégories d'entrées pour la détection de loyers perçus
+    entrees_categories = df[df['Type'] == 'Entrée']['Catégorie'].tolist()
+
+    # 1. Immobilier locatif (5 points) - Auto-détecté si entrées commençant par "Loyer"
+    has_loyer = any(cat.upper().startswith('LOYER') for cat in entrees_categories)
+    if has_loyer:
+        scores['immobilier']['score'] += 5
+        loyer_categories = [cat for cat in entrees_categories if cat.upper().startswith('LOYER')]
+        scores['immobilier']['details'].append({
+            'critere': 'Immobilier locatif',
+            'score': 5,
+            'max': 5,
+            'obtenu': True,
+            'explication': f"Loyers perçus détectés: {', '.join(loyer_categories)}",
+            'calculable': True
+        })
+    else:
+        scores['immobilier']['details'].append({
+            'critere': 'Immobilier locatif',
+            'score': 0,
+            'max': 5,
+            'obtenu': False,
+            'explication': 'Aucune catégorie d\'entrée commençant par "Loyer" détectée',
+            'calculable': True
+        })
+
+    # Critères manuels restants
+    immo_criteres_manuels = [
+        ('Si achat > Effet de levier', 5)
     ]
 
-    for critere, max_pts in immo_criteres:
+    for critere, max_pts in immo_criteres_manuels:
         scores['immobilier']['details'].append({
             'critere': critere,
             'score': 0,

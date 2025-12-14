@@ -74,6 +74,7 @@ def generate_finance_data(start_date: str = '2024-01', num_months: int = 12) -> 
         {'Catégorie': 'Salaire', 'Type': 'Entrée', 'base': 2800, 'variation': 0.02},
         {'Catégorie': 'Rente', 'Type': 'Entrée', 'base': 450, 'variation': 0.05},
         {'Catégorie': 'Bonus', 'Type': 'Entrée', 'base': 200, 'variation': 0.5},
+        {'Catégorie': 'Loyer Studio Lyon', 'Type': 'Entrée', 'base': 650, 'variation': 0.0},
 
         # SORTIES
         {'Catégorie': 'Loyer', 'Type': 'Sortie', 'base': 950, 'variation': 0.0},

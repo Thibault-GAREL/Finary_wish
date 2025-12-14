@@ -837,10 +837,31 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
             'calculable': True
         })
 
+    # 6. DCA tous les mois (3 points) - Auto-détecté si PEA et CTO présents
+    has_dca = has_pea and has_cto
+    if has_dca:
+        scores['bourse']['score'] += 3
+        scores['bourse']['details'].append({
+            'critere': 'DCA tous les mois',
+            'score': 3,
+            'max': 3,
+            'obtenu': True,
+            'explication': 'PEA et CTO détectés, DCA probable',
+            'calculable': True
+        })
+    else:
+        scores['bourse']['details'].append({
+            'critere': 'DCA tous les mois',
+            'score': 0,
+            'max': 3,
+            'obtenu': False,
+            'explication': 'PEA et CTO nécessaires pour validation automatique',
+            'calculable': True
+        })
+
     # Critères manuels restants
     bourse_criteres_manuels = [
         ('Minimum d\'overlap entre les ETFs', 1),
-        ('DCA tous les mois', 3),
         ('Si stock-picking, pas plus de 20%', 1),
         ('Prise de date sur Assurance Vie', 1)
     ]

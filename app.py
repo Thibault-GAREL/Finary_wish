@@ -85,16 +85,19 @@ def get_month_data(df: pd.DataFrame, month: str) -> dict:
     entrees = df[df['Type'] == 'Entrée'][['Catégorie', month]].copy()
     sorties = df[df['Type'] == 'Sortie'][['Catégorie', month]].copy()
     epargne = df[df['Type'] == 'Épargne'][['Catégorie', month]].copy()
+    patrimoine = df[df['Type'] == 'Patrimoine'][['Catégorie', month]].copy()
 
     # Renommer la colonne du mois en 'Montant' pour plus de clarté
     entrees.rename(columns={month: 'Montant'}, inplace=True)
     sorties.rename(columns={month: 'Montant'}, inplace=True)
     epargne.rename(columns={month: 'Montant'}, inplace=True)
+    patrimoine.rename(columns={month: 'Montant'}, inplace=True)
 
     # Calculer les totaux
     total_entrees = entrees['Montant'].sum()
     total_sorties = sorties['Montant'].sum()
     total_epargne = epargne['Montant'].sum()
+    total_patrimoine = patrimoine['Montant'].sum()
 
     # Calculer le taux d'épargne (épargne / entrées * 100)
     taux_epargne = (total_epargne / total_entrees * 100) if total_entrees > 0 else 0
@@ -106,9 +109,11 @@ def get_month_data(df: pd.DataFrame, month: str) -> dict:
         'entrees': entrees,
         'sorties': sorties,
         'epargne': epargne,
+        'patrimoine': patrimoine,
         'total_entrees': total_entrees,
         'total_sorties': total_sorties,
         'total_epargne': total_epargne,
+        'total_patrimoine': total_patrimoine,
         'taux_epargne': taux_epargne,
         'solde': solde
     }
@@ -728,6 +733,9 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
     # Récupérer les catégories de sorties pour la détection de "Frais au plancher"
     sorties_categories = df[df['Type'] == 'Sortie']['Catégorie'].tolist()
 
+    # Récupérer les catégories de patrimoine pour la détection de "Assurance Vie"
+    patrimoine_categories = df[df['Type'] == 'Patrimoine']['Catégorie'].tolist()
+
     # 1. Investissement en bourse (10 points) - Auto-détecté
     if has_bourse:
         scores['bourse']['score'] += 10
@@ -867,11 +875,33 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
             'calculable': True
         })
 
+    # 7. Prise de date sur Assurance Vie (1 point) - Auto-détecté dans le PATRIMOINE
+    has_assurance_vie = any(cat.upper().startswith('ASSURANCE VIE') for cat in patrimoine_categories)
+    if has_assurance_vie:
+        scores['bourse']['score'] += 1
+        av_categories = [cat for cat in patrimoine_categories if cat.upper().startswith('ASSURANCE VIE')]
+        scores['bourse']['details'].append({
+            'critere': 'Prise de date sur Assurance Vie',
+            'score': 1,
+            'max': 1,
+            'obtenu': True,
+            'explication': f"Détecté dans patrimoine: {', '.join(av_categories)}",
+            'calculable': True
+        })
+    else:
+        scores['bourse']['details'].append({
+            'critere': 'Prise de date sur Assurance Vie',
+            'score': 0,
+            'max': 1,
+            'obtenu': False,
+            'explication': 'Aucune catégorie "Assurance Vie" détectée dans le patrimoine',
+            'calculable': True
+        })
+
     # Critères manuels restants
     bourse_criteres_manuels = [
         ('Minimum d\'overlap entre les ETFs', 1),
-        ('Si stock-picking, pas plus de 20%', 1),
-        ('Prise de date sur Assurance Vie', 1)
+        ('Si stock-picking, pas plus de 20%', 1)
     ]
 
     for critere, max_pts in bourse_criteres_manuels:
@@ -1249,7 +1279,8 @@ def main():
         options=[
             "📊 Tableau de bord - Vue Simplifiée",
             "⚖️ Tableau de bord - Comparaison",
-            "📈 Évolution d'une Catégorie"
+            "📈 Évolution d'une Catégorie",
+            "💰 Visualisation du patrimoine"
         ],
         index=0
     )
@@ -1441,7 +1472,7 @@ def main():
     # ========================================================================
     # PAGE 3 : ÉVOLUTION D'UNE CATÉGORIE
     # ========================================================================
-    else:  # page == "📈 Évolution d'une Catégorie"
+    elif page == "📈 Évolution d'une Catégorie":
         st.markdown("## 📈 Évolution d'une Catégorie")
 
         # Sélecteur de catégorie dans la page (centré)
@@ -1557,6 +1588,175 @@ def main():
             - **📈 Maximum :** {max(values):.2f} € en {months[max_idx]}
             - **🔄 Amplitude :** {max(values) - min(values):.2f} €
             """)
+
+    # ========================================================================
+    # PAGE 4 : VISUALISATION DU PATRIMOINE
+    # ========================================================================
+    elif page == "💰 Visualisation du patrimoine":
+        st.markdown("## 💰 Visualisation du patrimoine")
+
+        # Sélecteur de mois dans la page
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            selected_month = st.selectbox(
+                "📅 Sélectionnez un mois :",
+                options=available_months,
+                index=len(available_months) - 1,  # Dernier mois par défaut
+                key="month_patrimoine"
+            )
+
+        st.markdown("---")
+
+        # Récupérer les données du mois sélectionné
+        month_data = get_month_data(df, selected_month)
+
+        # Afficher le patrimoine total
+        st.markdown(f"### 📊 Patrimoine total en {selected_month}")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric(
+                label="💎 Patrimoine Total",
+                value=f"{month_data['total_patrimoine']:,.0f} €".replace(',', ' ')
+            )
+
+        # Calculer le patrimoine du mois précédent pour la variation
+        if available_months.index(selected_month) > 0:
+            prev_month = available_months[available_months.index(selected_month) - 1]
+            prev_month_data = get_month_data(df, prev_month)
+            variation = month_data['total_patrimoine'] - prev_month_data['total_patrimoine']
+            variation_pct = (variation / prev_month_data['total_patrimoine'] * 100) if prev_month_data['total_patrimoine'] > 0 else 0
+
+            with col2:
+                st.metric(
+                    label="📈 Variation vs mois précédent",
+                    value=f"{variation:+,.0f} €".replace(',', ' '),
+                    delta=f"{variation_pct:+.1f}%"
+                )
+
+        st.markdown("---")
+
+        # Graphique en barres : Répartition du patrimoine par catégorie
+        st.markdown("### 📊 Répartition du patrimoine par catégorie")
+
+        if not month_data['patrimoine'].empty:
+            fig_bar = go.Figure()
+
+            # Trier par montant décroissant
+            patrimoine_sorted = month_data['patrimoine'].sort_values('Montant', ascending=True)
+
+            fig_bar.add_trace(go.Bar(
+                x=patrimoine_sorted['Montant'],
+                y=patrimoine_sorted['Catégorie'],
+                orientation='h',
+                marker=dict(
+                    color=patrimoine_sorted['Montant'],
+                    colorscale='Blues',
+                    showscale=True,
+                    colorbar=dict(title="Montant (€)")
+                ),
+                text=[f"{val:,.0f} €".replace(',', ' ') for val in patrimoine_sorted['Montant']],
+                textposition='auto',
+                hovertemplate='<b>%{y}</b><br>Montant: %{x:,.0f} €<extra></extra>'
+            ))
+
+            fig_bar.update_layout(
+                title=f"Patrimoine par catégorie - {selected_month}",
+                xaxis_title="Montant (€)",
+                yaxis_title="Catégorie",
+                height=400,
+                showlegend=False,
+                hovermode='closest'
+            )
+
+            st.plotly_chart(fig_bar, use_container_width=True)
+        else:
+            st.info("Aucune donnée de patrimoine disponible pour ce mois.")
+
+        st.markdown("---")
+
+        # Graphique : Évolution du patrimoine total sur tous les mois
+        st.markdown("### 📈 Évolution du patrimoine total")
+
+        # Calculer le patrimoine total pour chaque mois
+        months = []
+        patrimoine_total = []
+
+        for month in available_months:
+            month_d = get_month_data(df, month)
+            months.append(month)
+            patrimoine_total.append(month_d['total_patrimoine'])
+
+        fig_evolution = go.Figure()
+
+        fig_evolution.add_trace(go.Scatter(
+            x=months,
+            y=patrimoine_total,
+            mode='lines+markers',
+            name='Patrimoine Total',
+            line=dict(color='royalblue', width=3),
+            marker=dict(size=8),
+            fill='tozeroy',
+            fillcolor='rgba(65, 105, 225, 0.2)',
+            hovertemplate='<b>%{x}</b><br>Patrimoine: %{y:,.0f} €<extra></extra>'
+        ))
+
+        fig_evolution.update_layout(
+            title="Évolution du patrimoine total sur tous les mois",
+            xaxis_title="Mois",
+            yaxis_title="Patrimoine (€)",
+            height=400,
+            hovermode='x unified'
+        )
+
+        st.plotly_chart(fig_evolution, use_container_width=True)
+
+        st.markdown("---")
+
+        # Graphique circulaire : Répartition en pourcentage
+        st.markdown("### 🥧 Répartition en pourcentage")
+
+        if not month_data['patrimoine'].empty:
+            fig_pie = go.Figure()
+
+            fig_pie.add_trace(go.Pie(
+                labels=month_data['patrimoine']['Catégorie'],
+                values=month_data['patrimoine']['Montant'],
+                hole=0.4,
+                textinfo='label+percent',
+                hovertemplate='<b>%{label}</b><br>Montant: %{value:,.0f} €<br>Part: %{percent}<extra></extra>'
+            ))
+
+            fig_pie.update_layout(
+                title=f"Répartition du patrimoine - {selected_month}",
+                height=500,
+                showlegend=True
+            )
+
+            st.plotly_chart(fig_pie, use_container_width=True)
+
+        st.markdown("---")
+
+        # Tableau détaillé
+        st.markdown("### 📋 Détail par catégorie")
+
+        if not month_data['patrimoine'].empty:
+            # Créer un DataFrame avec les pourcentages
+            patrimoine_detail = month_data['patrimoine'].copy()
+            patrimoine_detail['Pourcentage'] = (patrimoine_detail['Montant'] / month_data['total_patrimoine'] * 100)
+            patrimoine_detail = patrimoine_detail.sort_values('Montant', ascending=False)
+
+            # Formater pour l'affichage
+            patrimoine_display = patrimoine_detail.copy()
+            patrimoine_display['Montant'] = patrimoine_display['Montant'].apply(lambda x: f"{x:,.2f} €".replace(',', ' '))
+            patrimoine_display['Pourcentage'] = patrimoine_display['Pourcentage'].apply(lambda x: f"{x:.1f}%")
+
+            st.dataframe(
+                patrimoine_display,
+                use_container_width=True,
+                hide_index=True
+            )
 
     # Footer
     st.markdown("---")

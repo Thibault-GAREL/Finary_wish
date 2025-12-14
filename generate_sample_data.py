@@ -93,6 +93,15 @@ def generate_finance_data(start_date: str = '2024-01', num_months: int = 12) -> 
         {'Catégorie': 'Compte Épargne', 'Type': 'Épargne', 'base': 200, 'variation': 0.2},
         {'Catégorie': 'PEA ETF World', 'Type': 'Épargne', 'base': 150, 'variation': 0.25},
         {'Catégorie': 'CTO Actions', 'Type': 'Épargne', 'base': 100, 'variation': 0.3},
+
+        # PATRIMOINE (valeurs accumulées)
+        {'Catégorie': 'Résidence principale', 'Type': 'Patrimoine', 'base': 180000, 'variation': 0.02},
+        {'Catégorie': 'Compte courant', 'Type': 'Patrimoine', 'base': 2500, 'variation': 0.3},
+        {'Catégorie': 'Livret A (valorisation)', 'Type': 'Patrimoine', 'base': 15000, 'variation': 0.05},
+        {'Catégorie': 'PEA (valorisation)', 'Type': 'Patrimoine', 'base': 12000, 'variation': 0.1},
+        {'Catégorie': 'CTO (valorisation)', 'Type': 'Patrimoine', 'base': 8000, 'variation': 0.12},
+        {'Catégorie': 'Assurance Vie Linxea', 'Type': 'Patrimoine', 'base': 25000, 'variation': 0.08},
+        {'Catégorie': 'Véhicule', 'Type': 'Patrimoine', 'base': 15000, 'variation': 0.05},
     ]
 
     # Créer le DataFrame
@@ -152,7 +161,7 @@ def main():
 
     # Afficher quelques statistiques
     print("\n--- Résumé par type ---")
-    for cat_type in ['Entrée', 'Sortie', 'Épargne']:
+    for cat_type in ['Entrée', 'Sortie', 'Épargne', 'Patrimoine']:
         count = len(df[df['Type'] == cat_type])
         print(f"{cat_type}: {count} catégories")
 

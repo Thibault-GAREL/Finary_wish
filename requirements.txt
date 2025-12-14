@@ -1,0 +1,14 @@
+# Dépendances pour l'application de visualisation de finances personnelles
+
+# Framework web pour l'application
+streamlit>=1.28.0
+
+# Manipulation et analyse de données
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Support Excel
+openpyxl>=3.1.0
+
+# Visualisations interactives
+plotly>=5.17.0

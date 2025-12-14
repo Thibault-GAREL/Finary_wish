@@ -1266,6 +1266,9 @@ def main():
             st.error(f"❌ Catégorie '{selected_category}' introuvable.")
             st.stop()
 
+        # Extraire le type de catégorie (nécessaire pour l'analyse de tendance)
+        cat_type = evolution_data['type']
+
         # Statistiques
         st.markdown("### 📊 Statistiques Globales")
         display_category_stats(evolution_data)

@@ -338,7 +338,7 @@ def plot_sankey_diagram(data: dict) -> go.Figure:
             'xanchor': 'center',
             'font': {'size': 18, 'color': '#333'}
         },
-        font=dict(size=14, color='white', family='Arial Black'),
+        font=dict(size=13, color='black', family='Arial, sans-serif'),
         height=700,
         margin=dict(t=80, b=40, l=40, r=40),
         paper_bgcolor='rgba(0,0,0,0)',
@@ -346,6 +346,316 @@ def plot_sankey_diagram(data: dict) -> go.Figure:
     )
 
     return fig
+
+
+def calculate_financial_score(data: dict, user_params: dict) -> dict:
+    """
+    Calcule le score financier global basé sur différents critères.
+
+    Args:
+        data: Données financières du mois
+        user_params: Paramètres additionnels fournis par l'utilisateur
+
+    Returns:
+        Dictionnaire contenant tous les scores et détails
+    """
+    scores = {
+        'budget': {'max': 40, 'score': 0, 'details': []},
+        'matelas': {'max': 15, 'score': 0, 'details': []},
+        'bourse': {'max': 25, 'score': 0, 'details': []},
+        'immobilier': {'max': 10, 'score': 0, 'details': []},
+        'crypto': {'max': 4, 'score': 0, 'details': []},
+        'reflexes': {'max': 6, 'score': 0, 'details': []}
+    }
+
+    # ========================================================================
+    # BUDGET (40 points)
+    # ========================================================================
+
+    # 1. Gagner plus que ce qu'on ne dépense (20 points)
+    total_depenses = data['total_sorties'] + data['total_epargne']
+    if data['total_entrees'] > total_depenses:
+        scores['budget']['score'] += 20
+        scores['budget']['details'].append({
+            'critere': 'Gagner plus que ce qu\'on ne dépense',
+            'score': 20,
+            'max': 20,
+            'obtenu': True,
+            'explication': f"Entrées ({data['total_entrees']:.0f}€) > Dépenses+Épargne ({total_depenses:.0f}€)",
+            'calculable': True
+        })
+    else:
+        scores['budget']['details'].append({
+            'critere': 'Gagner plus que ce qu\'on ne dépense',
+            'score': 0,
+            'max': 20,
+            'obtenu': False,
+            'explication': f"Entrées ({data['total_entrees']:.0f}€) ≤ Dépenses+Épargne ({total_depenses:.0f}€)",
+            'calculable': True
+        })
+
+    # 2. Se payer en premier (20 points)
+    taux_epargne_minimal = 10  # Au moins 10% d'épargne
+    if data['taux_epargne'] >= taux_epargne_minimal:
+        scores['budget']['score'] += 20
+        scores['budget']['details'].append({
+            'critere': 'Se payer en premier (≥10% d\'épargne)',
+            'score': 20,
+            'max': 20,
+            'obtenu': True,
+            'explication': f"Taux d'épargne: {data['taux_epargne']:.1f}% (≥{taux_epargne_minimal}%)",
+            'calculable': True
+        })
+    else:
+        score_partiel = int((data['taux_epargne'] / taux_epargne_minimal) * 20)
+        scores['budget']['score'] += score_partiel
+        scores['budget']['details'].append({
+            'critere': 'Se payer en premier (≥10% d\'épargne)',
+            'score': score_partiel,
+            'max': 20,
+            'obtenu': False,
+            'explication': f"Taux d'épargne: {data['taux_epargne']:.1f}% (<{taux_epargne_minimal}%) = {score_partiel}/20 pts",
+            'calculable': True
+        })
+
+    # ========================================================================
+    # MATELAS DE SÉCURITÉ (15 points)
+    # ========================================================================
+
+    if 'epargne_totale' in user_params and user_params['epargne_totale'] is not None:
+        mois_couverture = user_params['epargne_totale'] / data['total_sorties'] if data['total_sorties'] > 0 else 0
+        if mois_couverture >= 3 and mois_couverture <= 6:
+            scores['matelas']['score'] = 15
+            scores['matelas']['details'].append({
+                'critere': '3 à 6 mois de dépenses en épargne',
+                'score': 15,
+                'max': 15,
+                'obtenu': True,
+                'explication': f"Épargne totale: {user_params['epargne_totale']:.0f}€ = {mois_couverture:.1f} mois de dépenses",
+                'calculable': True
+            })
+        elif mois_couverture > 6:
+            scores['matelas']['score'] = 12
+            scores['matelas']['details'].append({
+                'critere': '3 à 6 mois de dépenses en épargne',
+                'score': 12,
+                'max': 15,
+                'obtenu': False,
+                'explication': f"Épargne totale: {user_params['epargne_totale']:.0f}€ = {mois_couverture:.1f} mois (>6, peut-être trop liquide)",
+                'calculable': True
+            })
+        else:
+            score_partiel = int((mois_couverture / 3) * 15)
+            scores['matelas']['score'] = min(score_partiel, 15)
+            scores['matelas']['details'].append({
+                'critere': '3 à 6 mois de dépenses en épargne',
+                'score': score_partiel,
+                'max': 15,
+                'obtenu': False,
+                'explication': f"Épargne totale: {user_params['epargne_totale']:.0f}€ = {mois_couverture:.1f} mois (<3 mois)",
+                'calculable': True
+            })
+    else:
+        scores['matelas']['details'].append({
+            'critere': '3 à 6 mois de dépenses en épargne',
+            'score': 0,
+            'max': 15,
+            'obtenu': False,
+            'explication': 'Renseignez votre épargne totale dans la sidebar',
+            'calculable': False
+        })
+
+    # ========================================================================
+    # BOURSE (25 points)
+    # ========================================================================
+
+    bourse_criteres = [
+        ('Investissement en bourse', 10),
+        ('Investissement via PEA en priorité', 3),
+        ('Investissement sur des ETFs', 3),
+        ('Minimum d\'overlap entre les ETFs', 1),
+        ('Frais au plancher', 2),
+        ('DCA tous les mois', 3),
+        ('Si stock-picking, pas plus de 20%', 1),
+        ('CTO (Compte-Titres Ordinaire)', 1),
+        ('Prise de date sur Assurance Vie', 1)
+    ]
+
+    for critere, max_pts in bourse_criteres:
+        scores['bourse']['details'].append({
+            'critere': critere,
+            'score': 0,
+            'max': max_pts,
+            'obtenu': False,
+            'explication': 'À renseigner manuellement',
+            'calculable': False
+        })
+
+    # ========================================================================
+    # IMMOBILIER (10 points)
+    # ========================================================================
+
+    immo_criteres = [
+        ('Si achat > Effet de levier', 5),
+        ('Immobilier locatif', 5)
+    ]
+
+    for critere, max_pts in immo_criteres:
+        scores['immobilier']['details'].append({
+            'critere': critere,
+            'score': 0,
+            'max': max_pts,
+            'obtenu': False,
+            'explication': 'À renseigner manuellement',
+            'calculable': False
+        })
+
+    # ========================================================================
+    # CRYPTO (4 points)
+    # ========================================================================
+
+    crypto_criteres = [
+        ('Bitcoin', 2),
+        ('Ethereum', 1),
+        ('DCA tous les mois/semaines', 1)
+    ]
+
+    for critere, max_pts in crypto_criteres:
+        scores['crypto']['details'].append({
+            'critere': critere,
+            'score': 0,
+            'max': max_pts,
+            'obtenu': False,
+            'explication': 'À renseigner manuellement',
+            'calculable': False
+        })
+
+    # ========================================================================
+    # RÉFLEXES GLOBAUX (6 points)
+    # ========================================================================
+
+    reflexes_criteres = [
+        ('Investissement en soi', 1),
+        ('Vision long terme', 1),
+        ('Objectif clairement défini', 2),
+        ('Optimisation de la fiscalité', 1),
+        ('Patrimoine suffisamment liquide', 1)
+    ]
+
+    for critere, max_pts in reflexes_criteres:
+        scores['reflexes']['details'].append({
+            'critere': critere,
+            'score': 0,
+            'max': max_pts,
+            'obtenu': False,
+            'explication': 'À renseigner manuellement',
+            'calculable': False
+        })
+
+    # ========================================================================
+    # CALCUL DU SCORE TOTAL
+    # ========================================================================
+
+    total_score = sum(cat['score'] for cat in scores.values())
+    total_max = sum(cat['max'] for cat in scores.values())
+    pourcentage = (total_score / total_max * 100) if total_max > 0 else 0
+
+    scores['total'] = {
+        'score': total_score,
+        'max': total_max,
+        'pourcentage': pourcentage
+    }
+
+    return scores
+
+
+def display_financial_score(scores: dict):
+    """
+    Affiche le score financier avec tous les détails.
+
+    Args:
+        scores: Dictionnaire contenant tous les scores calculés
+    """
+    st.markdown("## 🎯 Score Financier Global")
+
+    # Score total
+    total = scores['total']
+    col1, col2, col3 = st.columns([2, 1, 1])
+
+    with col1:
+        st.markdown(f"### Score: **{total['score']}/{total['max']}** points")
+
+    with col2:
+        st.markdown(f"### **{total['pourcentage']:.1f}%**")
+
+    with col3:
+        if total['pourcentage'] >= 80:
+            emoji = "🏆"
+            niveau = "Excellence"
+        elif total['pourcentage'] >= 60:
+            emoji = "🥈"
+            niveau = "Bon"
+        elif total['pourcentage'] >= 40:
+            emoji = "🥉"
+            niveau = "Moyen"
+        else:
+            emoji = "📈"
+            niveau = "À améliorer"
+        st.markdown(f"### {emoji} {niveau}")
+
+    # Barre de progression
+    progress_color = "green" if total['pourcentage'] >= 60 else "orange" if total['pourcentage'] >= 40 else "red"
+    st.markdown(f"""
+        <div style="background-color: #e0e0e0; border-radius: 10px; height: 30px; margin: 10px 0;">
+            <div style="background-color: {progress_color}; width: {total['pourcentage']:.1f}%;
+                        height: 100%; border-radius: 10px; text-align: center; line-height: 30px;
+                        color: white; font-weight: bold;">
+                {total['pourcentage']:.1f}%
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # Détails par catégorie
+    categories = [
+        ('budget', '💰 Budget', 'success'),
+        ('matelas', '🛡️ Matelas de sécurité', 'info'),
+        ('bourse', '📈 Bourse', 'warning'),
+        ('immobilier', '🏠 Immobilier', 'secondary'),
+        ('crypto', '₿ Crypto', 'primary'),
+        ('reflexes', '🧠 Réflexes globaux', 'light')
+    ]
+
+    for key, title, _ in categories:
+        cat_data = scores[key]
+        cat_score = cat_data['score']
+        cat_max = cat_data['max']
+        cat_pct = (cat_score / cat_max * 100) if cat_max > 0 else 0
+
+        with st.expander(f"{title} - {cat_score}/{cat_max} pts ({cat_pct:.0f}%)", expanded=False):
+            for detail in cat_data['details']:
+                if detail['calculable']:
+                    # Critère calculable - afficher en vert si obtenu, jaune sinon
+                    color = "green" if detail['obtenu'] else "orange"
+                    st.markdown(
+                        f"<div style='padding: 8px; margin: 5px 0; background-color: rgba({('0,128,0' if detail['obtenu'] else '255,165,0')},0.1); "
+                        f"border-left: 4px solid {color}; border-radius: 4px;'>"
+                        f"<b>{detail['critere']}</b>: {detail['score']}/{detail['max']} pts<br>"
+                        f"<small style='color: #666;'>{detail['explication']}</small>"
+                        f"</div>",
+                        unsafe_allow_html=True
+                    )
+                else:
+                    # Critère non calculable - afficher en rouge
+                    st.markdown(
+                        f"<div style='padding: 8px; margin: 5px 0; background-color: rgba(255,0,0,0.1); "
+                        f"border-left: 4px solid red; border-radius: 4px;'>"
+                        f"<b style='color: red;'>{detail['critere']}</b>: 0/{detail['max']} pts<br>"
+                        f"<small style='color: #666;'>{detail['explication']}</small>"
+                        f"</div>",
+                        unsafe_allow_html=True
+                    )
 
 
 def display_comparison_metrics(data1: dict, data2: dict, month1: str, month2: str):
@@ -579,6 +889,22 @@ def main():
         f"**Mois disponibles:** {len(available_months)}"
     )
 
+    # Paramètres pour le score financier
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🎯 Paramètres Score Financier")
+
+    epargne_totale = st.sidebar.number_input(
+        "💰 Épargne totale accumulée (€)",
+        min_value=0.0,
+        value=0.0,
+        step=100.0,
+        help="Montant total de votre épargne de sécurité (Livret A, etc.)"
+    )
+
+    user_params = {
+        'epargne_totale': epargne_totale if epargne_totale > 0 else None
+    }
+
     # Récupérer les données du/des mois sélectionné(s)
     month_data = get_month_data(df, selected_month)
 
@@ -644,6 +970,12 @@ def main():
         # Tableaux détaillés
         display_detailed_tables(month_data)
 
+        st.markdown("---")
+
+        # Score financier
+        scores = calculate_financial_score(month_data, user_params)
+        display_financial_score(scores)
+
     # ========================================================================
     # MODE COMPARAISON
     # ========================================================================
@@ -695,6 +1027,23 @@ def main():
                 'epargne'
             )
             st.plotly_chart(fig_comp_epargne, use_container_width=True)
+
+        st.markdown("---")
+
+        # Scores financiers comparés
+        st.markdown("### 🎯 Comparaison des Scores Financiers")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown(f"**{selected_month}**")
+            scores1 = calculate_financial_score(month_data, user_params)
+            display_financial_score(scores1)
+
+        with col2:
+            st.markdown(f"**{selected_month2}**")
+            scores2 = calculate_financial_score(month_data2, user_params)
+            display_financial_score(scores2)
 
     # Footer
     st.markdown("---")

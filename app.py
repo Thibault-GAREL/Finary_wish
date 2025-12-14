@@ -475,6 +475,15 @@ def plot_sankey_diagram(data: dict) -> go.Figure:
     for _, row in data['epargne'].iterrows():
         labels.append(f"{row['Catégorie']}<br>{row['Montant']:.0f} €")
         current_index += 1
+    epargne_end_idx = current_index
+
+    # 5. Calculer et ajouter le nœud "Marge non épargnée"
+    marge_non_epargnee = data['total_entrees'] - data['total_sorties'] - data['total_epargne']
+    marge_idx = None
+    if marge_non_epargnee > 0:
+        marge_idx = current_index
+        labels.append(f"💎 Marge non épargnée<br>{marge_non_epargnee:.0f} €")
+        current_index += 1
 
     # Créer les liens : Entrées -> Total Entrées
     for idx, (_, row) in enumerate(data['entrees'].iterrows()):
@@ -497,6 +506,13 @@ def plot_sankey_diagram(data: dict) -> go.Figure:
         values.append(row['Montant'])
         colors.append(color_epargne)
 
+    # Créer le lien : Total Entrées -> Marge non épargnée
+    if marge_idx is not None:
+        sources.append(total_entrees_idx)
+        targets.append(marge_idx)
+        values.append(marge_non_epargnee)
+        colors.append(color_epargne)  # Bleu comme l'épargne
+
     # Créer le diagramme de Sankey
     fig = go.Figure(data=[go.Sankey(
         node=dict(
@@ -505,9 +521,11 @@ def plot_sankey_diagram(data: dict) -> go.Figure:
             line=dict(color='white', width=2),
             label=labels,
             color=['#228B22' if i < entrees_end_idx  # Vert foncé pour entrées
-                   else '#1E90FF' if i >= epargne_start_idx  # Bleu foncé pour épargne
-                   else '#DC143C' if i >= sorties_start_idx  # Rouge foncé pour sorties
-                   else '#FFA500'  # Orange pour le nœud central
+                   else '#FFA500' if i == total_entrees_idx  # Orange pour le nœud central
+                   else '#DC143C' if sorties_start_idx <= i < sorties_end_idx  # Rouge foncé pour sorties
+                   else '#1E90FF' if epargne_start_idx <= i < epargne_end_idx  # Bleu foncé pour épargne
+                   else '#1E90FF' if marge_idx is not None and i == marge_idx  # Bleu pour marge non épargnée
+                   else '#808080'  # Gris par défaut
                    for i in range(len(labels))],
             customdata=[f'{i}' for i in range(len(labels))],
             hovertemplate='<b>%{label}</b><extra></extra>'
@@ -671,19 +689,89 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
     # BOURSE (25 points)
     # ========================================================================
 
-    bourse_criteres = [
-        ('Investissement en bourse', 10),
-        ('Investissement via PEA en priorité', 3),
+    # Détecter automatiquement les investissements PEA/CTO dans les catégories d'épargne
+    epargne_categories = df[df['Type'] == 'Épargne']['Catégorie'].tolist()
+    has_pea = any(cat.startswith('PEA') for cat in epargne_categories)
+    has_cto = any(cat.startswith('CTO') for cat in epargne_categories)
+    has_bourse = has_pea or has_cto
+
+    # 1. Investissement en bourse (10 points) - Auto-détecté
+    if has_bourse:
+        scores['bourse']['score'] += 10
+        categories_bourse = [cat for cat in epargne_categories if cat.startswith('PEA') or cat.startswith('CTO')]
+        scores['bourse']['details'].append({
+            'critere': 'Investissement en bourse',
+            'score': 10,
+            'max': 10,
+            'obtenu': True,
+            'explication': f"Détecté: {', '.join(categories_bourse)}",
+            'calculable': True
+        })
+    else:
+        scores['bourse']['details'].append({
+            'critere': 'Investissement en bourse',
+            'score': 0,
+            'max': 10,
+            'obtenu': False,
+            'explication': 'Aucune catégorie PEA/CTO détectée',
+            'calculable': True
+        })
+
+    # 2. Investissement via PEA en priorité (3 points) - Auto-détecté
+    if has_pea:
+        scores['bourse']['score'] += 3
+        pea_categories = [cat for cat in epargne_categories if cat.startswith('PEA')]
+        scores['bourse']['details'].append({
+            'critere': 'Investissement via PEA en priorité',
+            'score': 3,
+            'max': 3,
+            'obtenu': True,
+            'explication': f"Détecté: {', '.join(pea_categories)}",
+            'calculable': True
+        })
+    else:
+        scores['bourse']['details'].append({
+            'critere': 'Investissement via PEA en priorité',
+            'score': 0,
+            'max': 3,
+            'obtenu': False,
+            'explication': 'Aucune catégorie PEA détectée',
+            'calculable': True
+        })
+
+    # 3. CTO (Compte-Titres Ordinaire) (1 point) - Auto-détecté
+    if has_cto:
+        scores['bourse']['score'] += 1
+        cto_categories = [cat for cat in epargne_categories if cat.startswith('CTO')]
+        scores['bourse']['details'].append({
+            'critere': 'CTO (Compte-Titres Ordinaire)',
+            'score': 1,
+            'max': 1,
+            'obtenu': True,
+            'explication': f"Détecté: {', '.join(cto_categories)}",
+            'calculable': True
+        })
+    else:
+        scores['bourse']['details'].append({
+            'critere': 'CTO (Compte-Titres Ordinaire)',
+            'score': 0,
+            'max': 1,
+            'obtenu': False,
+            'explication': 'Aucune catégorie CTO détectée',
+            'calculable': True
+        })
+
+    # Critères manuels restants
+    bourse_criteres_manuels = [
         ('Investissement sur des ETFs', 3),
         ('Minimum d\'overlap entre les ETFs', 1),
         ('Frais au plancher', 2),
         ('DCA tous les mois', 3),
         ('Si stock-picking, pas plus de 20%', 1),
-        ('CTO (Compte-Titres Ordinaire)', 1),
         ('Prise de date sur Assurance Vie', 1)
     ]
 
-    for critere, max_pts in bourse_criteres:
+    for critere, max_pts in bourse_criteres_manuels:
         scores['bourse']['details'].append({
             'critere': critere,
             'score': 0,

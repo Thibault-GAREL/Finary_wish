@@ -201,7 +201,8 @@ def plot_category_evolution(evolution_data: dict) -> go.Figure:
     color_map = {
         'Entrée': '#228B22',  # Vert
         'Sortie': '#DC143C',  # Rouge
-        'Épargne': '#1E90FF'  # Bleu
+        'Épargne': '#1E90FF',  # Bleu
+        'Patrimoine': '#FFD700'  # Or
     }
     color = color_map.get(cat_type, '#808080')
 
@@ -227,6 +228,40 @@ def plot_category_evolution(evolution_data: dict) -> go.Figure:
         name='Moyenne',
         line=dict(color='gray', width=2, dash='dash'),
         hovertemplate=f'Moyenne: {mean_value:.2f} €<extra></extra>'
+    ))
+
+    # Courbe prédictive (régression linéaire)
+    import numpy as np
+    from datetime import datetime
+    from dateutil.relativedelta import relativedelta
+
+    # Préparer les données pour la régression
+    x = np.arange(len(values))
+    y = np.array(values)
+
+    # Calculer la régression linéaire
+    coefficients = np.polyfit(x, y, 1)  # Degré 1 = linéaire
+    trend = np.poly1d(coefficients)
+
+    # Prédire pour 6 mois futurs
+    num_future_months = 6
+    x_future = np.arange(len(values), len(values) + num_future_months)
+    y_future = trend(x_future)
+
+    # Générer les labels de mois futurs
+    last_month = datetime.strptime(months[-1], '%Y-%m')
+    future_months = [(last_month + relativedelta(months=i+1)).strftime('%Y-%m') for i in range(num_future_months)]
+
+    # Ajouter la courbe prédictive
+    fig.add_trace(go.Scatter(
+        x=future_months,
+        y=y_future,
+        mode='lines+markers',
+        name='Prédiction (tendance)',
+        line=dict(color=color, width=2, dash='dot'),
+        marker=dict(size=6, color=color, symbol='diamond'),
+        hovertemplate='%{x}<br>Prédiction: %{y:.2f} €<extra></extra>',
+        opacity=0.6
     ))
 
     fig.update_layout(
@@ -606,11 +641,54 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
     scores = {
         'budget': {'max': 40, 'score': 0, 'details': []},
         'matelas': {'max': 15, 'score': 0, 'details': []},
-        'bourse': {'max': 25, 'score': 0, 'details': []},
-        'immobilier': {'max': 10, 'score': 0, 'details': []},
-        'crypto': {'max': 4, 'score': 0, 'details': []},
-        'reflexes': {'max': 6, 'score': 0, 'details': []}
+        'bourse': {'max': 23, 'score': 0, 'details': []},  # Retiré 2 pts (overlap + stock-picking)
+        'immobilier': {'max': 5, 'score': 0, 'details': []},  # Retiré 5 pts (effet de levier)
+        'crypto': {'max': 4, 'score': 0, 'details': []}
     }
+
+    # Questions à se poser (critères retirés du score)
+    questions = [
+        {
+            'categorie': 'Bourse',
+            'question': 'Minimum d\'overlap entre les ETFs ?',
+            'explication': 'Vérifiez que vos ETFs ne se chevauchent pas trop pour maximiser la diversification'
+        },
+        {
+            'categorie': 'Bourse',
+            'question': 'Si stock-picking, pas plus de 20% du portefeuille ?',
+            'explication': 'Le stock-picking (actions individuelles) devrait rester minoritaire pour limiter le risque'
+        },
+        {
+            'categorie': 'Immobilier',
+            'question': 'Si achat immobilier > Utilisez-vous l\'effet de levier ?',
+            'explication': 'L\'effet de levier (emprunt) peut amplifier les rendements de l\'investissement immobilier'
+        },
+        {
+            'categorie': 'Réflexes Globaux',
+            'question': 'Investissez-vous en vous-même ?',
+            'explication': 'Formation, santé, développement personnel sont des investissements rentables'
+        },
+        {
+            'categorie': 'Réflexes Globaux',
+            'question': 'Avez-vous une vision long terme ?',
+            'explication': 'Investir sur 10, 20, 30 ans permet de lisser la volatilité et maximiser les rendements'
+        },
+        {
+            'categorie': 'Réflexes Globaux',
+            'question': 'Avez-vous un objectif clairement défini ?',
+            'explication': 'Retraite, achat immobilier, indépendance financière : définir un but permet de mieux investir'
+        },
+        {
+            'categorie': 'Réflexes Globaux',
+            'question': 'Optimisez-vous votre fiscalité ?',
+            'explication': 'PEA, assurance-vie, PERP : utilisez les enveloppes fiscales adaptées'
+        },
+        {
+            'categorie': 'Réflexes Globaux',
+            'question': 'Votre patrimoine est-il suffisamment liquide ?',
+            'explication': 'Gardez une partie de votre épargne facilement accessible en cas d\'imprévu'
+        }
+    ]
 
     # ========================================================================
     # BUDGET (40 points)
@@ -898,22 +976,6 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
             'calculable': True
         })
 
-    # Critères manuels restants
-    bourse_criteres_manuels = [
-        ('Minimum d\'overlap entre les ETFs', 1),
-        ('Si stock-picking, pas plus de 20%', 1)
-    ]
-
-    for critere, max_pts in bourse_criteres_manuels:
-        scores['bourse']['details'].append({
-            'critere': critere,
-            'score': 0,
-            'max': max_pts,
-            'obtenu': False,
-            'explication': 'À renseigner manuellement',
-            'calculable': False
-        })
-
     # ========================================================================
     # IMMOBILIER (10 points)
     # ========================================================================
@@ -942,21 +1004,6 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
             'obtenu': False,
             'explication': 'Aucune catégorie d\'entrée commençant par "Loyer" détectée',
             'calculable': True
-        })
-
-    # Critères manuels restants
-    immo_criteres_manuels = [
-        ('Si achat > Effet de levier', 5)
-    ]
-
-    for critere, max_pts in immo_criteres_manuels:
-        scores['immobilier']['details'].append({
-            'critere': critere,
-            'score': 0,
-            'max': max_pts,
-            'obtenu': False,
-            'explication': 'À renseigner manuellement',
-            'calculable': False
         })
 
     # ========================================================================
@@ -1047,28 +1094,6 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
         })
 
     # ========================================================================
-    # RÉFLEXES GLOBAUX (6 points)
-    # ========================================================================
-
-    reflexes_criteres = [
-        ('Investissement en soi', 1),
-        ('Vision long terme', 1),
-        ('Objectif clairement défini', 2),
-        ('Optimisation de la fiscalité', 1),
-        ('Patrimoine suffisamment liquide', 1)
-    ]
-
-    for critere, max_pts in reflexes_criteres:
-        scores['reflexes']['details'].append({
-            'critere': critere,
-            'score': 0,
-            'max': max_pts,
-            'obtenu': False,
-            'explication': 'À renseigner manuellement',
-            'calculable': False
-        })
-
-    # ========================================================================
     # CALCUL DU SCORE TOTAL
     # ========================================================================
 
@@ -1082,7 +1107,32 @@ def calculate_financial_score(data: dict, user_params: dict, df: pd.DataFrame) -
         'pourcentage': pourcentage
     }
 
-    return scores
+    return scores, questions
+
+
+def display_questions(questions: list):
+    """
+    Affiche les questions de réflexion financière.
+
+    Args:
+        questions: Liste des questions à se poser
+    """
+    st.markdown("### 💭 Questions à se poser")
+    st.markdown("---")
+
+    # Grouper les questions par catégorie
+    from collections import defaultdict
+    questions_par_cat = defaultdict(list)
+    for q in questions:
+        questions_par_cat[q['categorie']].append(q)
+
+    # Afficher les questions par catégorie
+    for categorie, qs in questions_par_cat.items():
+        st.markdown(f"#### {categorie}")
+        for q in qs:
+            with st.expander(f"❓ {q['question']}"):
+                st.info(q['explication'])
+        st.markdown("")
 
 
 def display_financial_score(scores: dict):
@@ -1468,8 +1518,11 @@ def main():
         st.markdown("---")
 
         # Score financier
-        scores = calculate_financial_score(month_data, user_params, df)
+        scores, questions = calculate_financial_score(month_data, user_params, df)
         display_financial_score(scores)
+
+        # Questions à se poser
+        display_questions(questions)
 
     # ========================================================================
     # PAGE 2 : COMPARAISON
@@ -1515,12 +1568,12 @@ def main():
         with col1:
             st.markdown(f"**{selected_month}**")
             fig_sankey1 = plot_sankey_diagram(month_data)
-            st.plotly_chart(fig_sankey1, use_container_width=True)
+            st.plotly_chart(fig_sankey1, use_container_width=True, key=f"sankey_comp_1_{selected_month}")
 
         with col2:
             st.markdown(f"**{selected_month2}**")
             fig_sankey2 = plot_sankey_diagram(month_data2)
-            st.plotly_chart(fig_sankey2, use_container_width=True)
+            st.plotly_chart(fig_sankey2, use_container_width=True, key=f"sankey_comp_2_{selected_month2}")
 
         st.markdown("---")
 
@@ -1554,13 +1607,17 @@ def main():
 
         with col1:
             st.markdown(f"**{selected_month}**")
-            scores1 = calculate_financial_score(month_data, user_params, df)
+            scores1, questions = calculate_financial_score(month_data, user_params, df)
             display_financial_score(scores1)
 
         with col2:
             st.markdown(f"**{selected_month2}**")
-            scores2 = calculate_financial_score(month_data2, user_params, df)
+            scores2, _ = calculate_financial_score(month_data2, user_params, df)
             display_financial_score(scores2)
+
+        # Questions à se poser (une seule fois pour les deux mois)
+        st.markdown("---")
+        display_questions(questions)
 
     # ========================================================================
     # PAGE 3 : ÉVOLUTION D'UNE CATÉGORIE
@@ -1570,7 +1627,14 @@ def main():
 
         # Sélecteur de catégorie dans la page (centré)
         all_categories = get_all_categories(df)
-        category_options = [f"{cat} ({typ})" for cat, typ in all_categories]
+
+        # Ajouter des options spéciales pour les totaux
+        special_options = [
+            "📥 TOUTES LES ENTRÉES (Entrée)",
+            "📤 TOUTES LES SORTIES (Sortie)",
+            "💰 TOUT LE PATRIMOINE (Patrimoine)"
+        ]
+        category_options = special_options + [f"{cat} ({typ})" for cat, typ in all_categories]
 
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
@@ -1581,20 +1645,52 @@ def main():
                 key="category_evolution"
             )
 
-        # Extraire le nom de la catégorie
-        selected_category = selected_category_full.split(" (")[0]
+        # Déterminer si c'est une option spéciale ou une catégorie normale
+        is_total_view = selected_category_full in special_options
+
+        if is_total_view:
+            # Extraire le type pour les vues totales
+            if "ENTRÉES" in selected_category_full:
+                selected_category = "TOUTES LES ENTRÉES"
+                category_type = "Entrée"
+            elif "SORTIES" in selected_category_full:
+                selected_category = "TOUTES LES SORTIES"
+                category_type = "Sortie"
+            else:  # PATRIMOINE
+                selected_category = "TOUT LE PATRIMOINE"
+                category_type = "Patrimoine"
+        else:
+            # Extraire le nom de la catégorie normale
+            selected_category = selected_category_full.split(" (")[0]
+            category_type = None
 
         st.markdown("---")
 
         # Récupérer les données d'évolution
-        evolution_data = get_category_evolution(df, selected_category)
+        if is_total_view:
+            # Calculer l'évolution du total pour un type donné
+            month_columns = [col for col in df.columns if col not in ['Catégorie', 'Type']]
+            type_df = df[df['Type'] == category_type]
 
-        if evolution_data is None:
-            st.error(f"❌ Catégorie '{selected_category}' introuvable.")
-            st.stop()
+            # Sommer toutes les catégories de ce type pour chaque mois
+            values = [type_df[month].sum() for month in month_columns]
 
-        # Extraire le type de catégorie (nécessaire pour l'analyse de tendance)
-        cat_type = evolution_data['type']
+            evolution_data = {
+                'category': selected_category,
+                'type': category_type,
+                'months': month_columns,
+                'values': values
+            }
+            cat_type = category_type
+        else:
+            evolution_data = get_category_evolution(df, selected_category)
+
+            if evolution_data is None:
+                st.error(f"❌ Catégorie '{selected_category}' introuvable.")
+                st.stop()
+
+            # Extraire le type de catégorie (nécessaire pour l'analyse de tendance)
+            cat_type = evolution_data['type']
 
         # Statistiques
         st.markdown("### 📊 Statistiques Globales")

@@ -1189,8 +1189,7 @@ def display_financial_score(scores: dict):
         ('matelas', '🛡️ Matelas de sécurité', 'info'),
         ('bourse', '📈 Bourse', 'warning'),
         ('immobilier', '🏠 Immobilier', 'secondary'),
-        ('crypto', '₿ Crypto', 'primary'),
-        ('reflexes', '🧠 Réflexes globaux', 'light')
+        ('crypto', '₿ Crypto', 'primary')
     ]
 
     for key, title, _ in categories:

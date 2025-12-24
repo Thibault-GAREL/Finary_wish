@@ -1674,11 +1674,23 @@ def main():
             # Sommer toutes les catégories de ce type pour chaque mois
             values = [type_df[month].sum() for month in month_columns]
 
+            # Calculer les statistiques
+            values_array = pd.Series(values)
+            stats = {
+                'min': values_array.min(),
+                'max': values_array.max(),
+                'mean': values_array.mean(),
+                'median': values_array.median(),
+                'std': values_array.std(),
+                'total': values_array.sum()
+            }
+
             evolution_data = {
                 'category': selected_category,
                 'type': category_type,
                 'months': month_columns,
-                'values': values
+                'values': values,
+                'stats': stats
             }
             cat_type = category_type
         else:

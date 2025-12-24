@@ -1351,21 +1351,21 @@ def display_detailed_tables(data: dict):
     with tab1:
         st.dataframe(
             data['entrees'].style.format({'Montant': '{:.2f} €'}),
-            use_container_width=True,
+            width='stretch',
             hide_index=True
         )
 
     with tab2:
         st.dataframe(
             data['sorties'].style.format({'Montant': '{:.2f} €'}),
-            use_container_width=True,
+            width='stretch',
             hide_index=True
         )
 
     with tab3:
         st.dataframe(
             data['epargne'].style.format({'Montant': '{:.2f} €'}),
-            use_container_width=True,
+            width='stretch',
             hide_index=True
         )
 
@@ -1468,7 +1468,7 @@ def main():
         # Diagramme de Sankey - Flux d'argent
         st.markdown("### 🌊 Flux d'Argent")
         fig_sankey = plot_sankey_diagram(month_data)
-        st.plotly_chart(fig_sankey, use_container_width=True)
+        st.plotly_chart(fig_sankey, width='stretch')
 
         st.markdown("---")
 
@@ -1484,7 +1484,7 @@ def main():
                     month_data['sorties'],
                     "Répartition des Sorties"
                 )
-                st.plotly_chart(fig_sorties, use_container_width=True)
+                st.plotly_chart(fig_sorties, width='stretch')
             else:
                 st.info("Aucune donnée de sorties pour ce mois.")
 
@@ -1495,7 +1495,7 @@ def main():
                     month_data['epargne'],
                     "Répartition de l'Épargne"
                 )
-                st.plotly_chart(fig_epargne, use_container_width=True)
+                st.plotly_chart(fig_epargne, width='stretch')
             else:
                 st.info("Aucune donnée d'épargne pour ce mois.")
 
@@ -1507,7 +1507,7 @@ def main():
                 "Montant des Sorties par Catégorie",
                 color='#ff7f0e'
             )
-            st.plotly_chart(fig_bar_sorties, use_container_width=True)
+            st.plotly_chart(fig_bar_sorties, width='stretch')
 
         st.markdown("---")
 
@@ -1567,12 +1567,12 @@ def main():
         with col1:
             st.markdown(f"**{selected_month}**")
             fig_sankey1 = plot_sankey_diagram(month_data)
-            st.plotly_chart(fig_sankey1, use_container_width=True, key=f"sankey_comp_1_{selected_month}")
+            st.plotly_chart(fig_sankey1, width='stretch', key=f"sankey_comp_1_{selected_month}")
 
         with col2:
             st.markdown(f"**{selected_month2}**")
             fig_sankey2 = plot_sankey_diagram(month_data2)
-            st.plotly_chart(fig_sankey2, use_container_width=True, key=f"sankey_comp_2_{selected_month2}")
+            st.plotly_chart(fig_sankey2, width='stretch', key=f"sankey_comp_2_{selected_month2}")
 
         st.markdown("---")
 
@@ -1586,7 +1586,7 @@ def main():
                 selected_month, selected_month2,
                 'sorties'
             )
-            st.plotly_chart(fig_comp_sorties, use_container_width=True)
+            st.plotly_chart(fig_comp_sorties, width='stretch')
 
         # Comparaison de l'épargne
         if not month_data['epargne'].empty or not month_data2['epargne'].empty:
@@ -1595,7 +1595,7 @@ def main():
                 selected_month, selected_month2,
                 'epargne'
             )
-            st.plotly_chart(fig_comp_epargne, use_container_width=True)
+            st.plotly_chart(fig_comp_epargne, width='stretch')
 
         st.markdown("---")
 
@@ -1712,7 +1712,7 @@ def main():
         # Graphique d'évolution
         st.markdown("### 📈 Graphique d'Évolution")
         fig_evolution = plot_category_evolution(evolution_data)
-        st.plotly_chart(fig_evolution, use_container_width=True)
+        st.plotly_chart(fig_evolution, width='stretch')
 
         st.markdown("---")
 
@@ -1738,7 +1738,7 @@ def main():
                 'Variation (€)': '{:+.2f}',
                 'Variation (%)': '{:+.1f}%'
             }),
-            use_container_width=True,
+            width='stretch',
             hide_index=True
         )
 
@@ -1870,7 +1870,7 @@ def main():
                 hovermode='closest'
             )
 
-            st.plotly_chart(fig_bar, use_container_width=True)
+            st.plotly_chart(fig_bar, width='stretch')
         else:
             st.info("Aucune donnée de patrimoine disponible pour ce mois.")
 
@@ -1910,7 +1910,7 @@ def main():
             hovermode='x unified'
         )
 
-        st.plotly_chart(fig_evolution, use_container_width=True)
+        st.plotly_chart(fig_evolution, width='stretch')
 
         st.markdown("---")
 
@@ -1934,7 +1934,7 @@ def main():
                 showlegend=True
             )
 
-            st.plotly_chart(fig_pie, use_container_width=True)
+            st.plotly_chart(fig_pie, width='stretch')
 
         st.markdown("---")
 
@@ -1954,7 +1954,7 @@ def main():
 
             st.dataframe(
                 patrimoine_display,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True
             )
 

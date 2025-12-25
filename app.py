@@ -616,7 +616,7 @@ def plot_sankey_diagram(data: dict) -> go.Figure:
             'xanchor': 'center',
             'font': {'size': 18, 'color': '#333'}
         },
-        font=dict(size=13, color='black', family='Arial, sans-serif'),
+        font=dict(size=13, color='white', family='Arial, sans-serif'),
         height=700,
         margin=dict(t=80, b=40, l=40, r=40),
         paper_bgcolor='rgba(0,0,0,0)',
